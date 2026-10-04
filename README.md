@@ -46,7 +46,7 @@ It answers from the documents only. It does not give investment advice.
 ## Roadmap
 
 - [x] Repository skeleton
-- [ ] Backend runs: FastAPI health endpoint, PostgreSQL with pgvector in Docker
+- [x] Backend runs: FastAPI health endpoint, PostgreSQL with pgvector in Docker
 - [ ] Ingest one report end to end
 - [ ] Plain question answering with page citations
 - [ ] Evaluation set and baseline accuracy score
@@ -54,6 +54,33 @@ It answers from the documents only. It does not give investment advice.
 - [ ] LangGraph agent with grading, rewriting and number verification
 - [ ] Web app: chat, live progress and cited-page viewer
 - [ ] 10–15 companies, model comparison, live demo
+
+## Run locally
+
+You need Docker and [uv](https://docs.astral.sh/uv/).
+
+```bash
+docker compose up -d db            # PostgreSQL with pgvector on port 5440
+cd backend
+cp .env.example .env
+uv sync                            # installs Python 3.12 and the dependencies
+uv run uvicorn app.main:app --reload
+```
+
+Then open <http://localhost:8000/docs> for the API docs, or check that the
+API can reach the database:
+
+```bash
+curl localhost:8000/health/ready
+```
+
+Run the checks from `backend/`:
+
+```bash
+uv run ruff check . && uv run ruff format --check .
+uv run mypy app tests
+uv run pytest
+```
 
 ## Repository layout
 
