@@ -212,8 +212,29 @@ Choose with `--pipeline baseline|agent` and `--expand-pages/--no-expand-pages`.
 
 **How far to trust these numbers.** This is 35 questions on one report, and
 the same questions were used to decide what to build next, so the score is
-optimistic. A fresh set of questions, and more reports, are needed before
-quoting it as a general accuracy figure.
+optimistic. The held-out set below is the fairer measure.
+
+### Held-out questions (4 October 2026)
+
+`backend/evals/heldout.yaml` holds 19 questions written after the system was
+built, from pages the first set did not use (standalone statements, the
+liquidity section, the CSR annexure, directors' remuneration). They are never
+used to decide what to change. Run them with
+`uv run python -m app.cli eval --dataset evals/heldout.yaml`.
+
+| Run                                  | Correct          | Figures verified | Rewrites needed          |
+| ------------------------------------ | ---------------- | ---------------- | ------------------------ |
+| Agent, default settings, single run  | **19/19 (100%)** | 17 of 17         | Only on the 2 with no answer |
+
+What this does and does not show:
+
+- It shows the system finds and reads single facts across this report
+  reliably, including from table-heavy pages, and declines to answer what is
+  not there.
+- Every question asks for one fact from one page. Comparisons across years or
+  companies, and questions that need a calculation, are not covered yet.
+- It is still one report from one company. Other reports are laid out
+  differently and may parse worse.
 
 ## Repository layout
 

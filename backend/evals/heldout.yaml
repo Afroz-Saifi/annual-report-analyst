@@ -1,0 +1,131 @@
+# Held-out questions for the Infosys Integrated Annual Report 2025-26.
+#
+# These were written after the system was built (commit f5f8195) and are never
+# used to decide what to change. They exist to give an accuracy figure that
+# the system has not been tuned towards. Do not fix the system against
+# individual questions here: add new questions instead.
+#
+# `page` is the PDF page position each answer was read from.
+
+questions:
+  # --- Standalone statement of profit and loss ------------------------------
+  - id: ho-standalone-revenue
+    category: financial_statement
+    question: What was Infosys's standalone revenue from operations for the year ended March 31, 2026, in ₹ crore?
+    type: number
+    accepted: ["1,48,819"]
+    page: 209
+  - id: ho-standalone-profit
+    category: financial_statement
+    question: In the Standalone Statement of Profit and Loss, what was the profit for the year ended March 31, 2026, in ₹ crore?
+    type: number
+    accepted: ["29,211"]
+    page: 209
+  - id: ho-standalone-other-income
+    category: financial_statement
+    question: What was other income, net, on a standalone basis for the year ended March 31, 2026, in ₹ crore?
+    type: number
+    accepted: ["6,491"]
+    page: 209
+  - id: ho-standalone-labour-codes
+    category: financial_statement
+    question: What was the exceptional item for the impact of the Labour Codes in the standalone financial statements for fiscal 2026, in ₹ crore?
+    type: number
+    accepted: ["1,146"]
+    page: 209
+
+  # --- Five-year summary ------------------------------------------------------
+  - id: ho-net-profit-fy24
+    category: financial_statement
+    question: What was Infosys's net profit attributable to owners of the Company for fiscal 2024, in ₹ crore?
+    type: number
+    accepted: ["26,233"]
+    page: 16
+  - id: ho-market-cap-fy26
+    category: financial_statement
+    question: What was Infosys's market capitalization for fiscal 2026, in ₹ crore?
+    type: number
+    accepted: ["5,07,192"]
+    page: 16
+
+  # --- Board's report: liquidity and buyback ----------------------------------
+  - id: ho-working-capital-consolidated
+    category: boards_report
+    question: How much working capital did Infosys have on a consolidated basis as of March 31, 2026, in ₹ crore?
+    type: number
+    accepted: ["51,167"]
+    page: 36
+  - id: ho-working-capital-standalone
+    category: boards_report
+    question: How much working capital did Infosys have on a standalone basis as of March 31, 2026, in ₹ crore?
+    type: number
+    accepted: ["40,794"]
+    page: 36
+  - id: ho-cash-investments-fy25
+    category: boards_report
+    question: What were consolidated cash and investments as on March 31, 2025, in ₹ crore?
+    type: number
+    accepted: ["47,549"]
+    page: 36
+  - id: ho-buyback-shares
+    category: boards_report
+    question: How many equity shares did Infosys purchase in the fiscal 2026 buyback?
+    type: number
+    accepted: ["10,00,00,000"]
+    page: 36
+  - id: ho-buyback-board-date
+    category: boards_report
+    question: On what date did the Board approve the proposal to buy back shares?
+    type: text
+    accepted: ["September 11, 2025", "11 September 2025", "11th September 2025", "September 11th, 2025"]
+    page: 36
+
+  # --- CSR annexure -------------------------------------------------------------
+  - id: ho-csr-obligation
+    category: csr
+    question: What was Infosys's total CSR obligation for the financial year, in ₹ crore?
+    type: number
+    accepted: ["577.36"]
+    page: 65
+  - id: ho-csr-admin-overheads
+    category: csr
+    question: How much did Infosys spend on administrative overheads for CSR, in ₹ crore?
+    type: number
+    accepted: ["9.25"]
+    page: 65
+  - id: ho-csr-average-profit
+    category: csr
+    question: What was the average net profit of the Company under sub-section (5) of Section 135, in ₹ crore?
+    type: number
+    accepted: ["28,848.03"]
+    page: 65
+
+  # --- Directors' remuneration ----------------------------------------------------
+  - id: ho-ceo-total-remuneration
+    category: governance
+    question: What was Salil Parekh's total remuneration in fiscal 2026, in ₹ crore?
+    type: number
+    accepted: ["82.60"]
+    page: 116
+  - id: ho-ceo-variable-pay
+    category: governance
+    question: How much did Salil Parekh receive as bonus, incentives and variable pay in fiscal 2026, in ₹ crore?
+    type: number
+    accepted: ["23.35"]
+    page: 116
+  - id: ho-director-commission
+    category: governance
+    question: What commission was paid to D. Sundaram for fiscal 2026, in ₹ crore?
+    type: number
+    accepted: ["3.18"]
+    page: 116
+
+  # --- Not in the report ---------------------------------------------------------
+  - id: ho-na-other-company
+    category: unanswerable
+    question: What was Accenture's operating margin in fiscal 2026?
+    answerable: false
+  - id: ho-na-off-topic
+    category: unanswerable
+    question: What is the population of Bengaluru?
+    answerable: false
