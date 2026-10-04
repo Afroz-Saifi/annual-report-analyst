@@ -27,7 +27,11 @@ def _sha256(path: Path) -> str:
 
 
 async def ingest_report(
-    session: AsyncSession, embeddings: Embeddings, entry: ReportEntry, pdf_path: Path
+    session: AsyncSession,
+    embeddings: Embeddings,
+    entry: ReportEntry,
+    pdf_path: Path,
+    force: bool = False,
 ) -> IngestResult:
     file_sha256 = await asyncio.to_thread(_sha256, pdf_path)
 
@@ -35,7 +39,7 @@ async def ingest_report(
         select(Report).where(Report.ticker == entry.ticker, Report.fiscal_year == entry.fiscal_year)
     )
     if existing is not None:
-        if existing.file_sha256 == file_sha256:
+        if existing.file_sha256 == file_sha256 and not force:
             if existing.file_name != entry.file:
                 existing.file_name = entry.file
                 await session.commit()

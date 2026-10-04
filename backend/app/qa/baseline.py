@@ -28,6 +28,14 @@ Rules:
 - Use only the numbered sources below. Do not use outside knowledge.
 - After each claim, cite the sources that support it, like [1] or [2][5].
 - Copy figures exactly as written in the source, with their units.
+- Sources may come from several companies and years; each is labelled. Say
+  which company and fiscal year each figure belongs to.
+- If the question names no year, answer for the most recent year in the
+  sources and say so.
+- Calculate only when the question asks for a change, difference, total or
+  ratio. Then state each figure you use, with its citation, and the result,
+  rounded to the precision of those figures. Never add or subtract figures to
+  stand in for one the sources do not state: say it is not stated instead.
 - If the sources do not contain the answer, say so plainly, cite nothing and
   set found to false.
 - Report what the documents say. Do not give investment advice."""

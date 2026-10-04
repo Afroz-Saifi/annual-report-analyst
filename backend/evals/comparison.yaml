@@ -1,0 +1,94 @@
+# Questions that compare figures across fiscal years for Infosys.
+#
+# Most need both the 2025-26 and the 2024-25 annual reports: one figure comes
+# from each. `page` is the page in the 2025-26 report and `other_page` the page
+# in the 2024-25 report (PDF page positions). Questions marked `calculation`
+# need the system to work out a difference itself, which no page states.
+#
+# This set was written to measure the multi-report agent and may be used to
+# improve it, so it is not held out.
+
+questions:
+  # --- Two figures, one from each year's report -----------------------------
+  - id: yoy-employees
+    category: year_on_year
+    question: How many total employees did Infosys have at the end of fiscal 2026, and at the end of fiscal 2025?
+    type: number
+    # The report prints two totals for the end of fiscal 2026 in different
+    # tables (3,52,095 on the workforce table, 3,51,630 on the training table).
+    accepted: ["3,52,095 and 3,48,596", "3,51,630 and 3,48,596"]
+    page: 143
+    other_page: 134
+  - id: yoy-ceo-remuneration
+    category: year_on_year
+    question: What was Salil Parekh's total remuneration in fiscal 2026, and in fiscal 2025, in ₹ crore?
+    type: number
+    accepted: ["82.60 and 80.62"]
+    page: 116
+    other_page: 107
+  - id: yoy-patents
+    category: year_on_year
+    question: How many patents were in Infosys's portfolio in fiscal 2026, and how many in fiscal 2025?
+    type: number
+    accepted: ["973 and 823"]
+    page: 25
+    other_page: 22
+  - id: yoy-nationalities
+    category: year_on_year
+    question: How many nationalities were in Infosys's workforce in fiscal 2026, and how many in fiscal 2025?
+    type: number
+    accepted: ["155 and 156"]
+    page: 25
+    other_page: 22
+  - id: yoy-differently-abled
+    category: year_on_year
+    question: How many differently-abled employees did Infosys report at the end of fiscal 2026, and at the end of fiscal 2025?
+    type: number
+    accepted: ["1,075 and 1,095"]
+    page: 143
+    other_page: 134
+  - id: yoy-clients-50m
+    category: year_on_year
+    question: How many clients contributing more than US$50 million did Infosys have in fiscal 2026, and in fiscal 2025?
+    type: number
+    accepted: ["88 and 85"]
+    page: 16
+    other_page: 15
+  - id: yoy-attrition-fy23
+    category: year_on_year
+    question: What was the total voluntary attrition for Infosys's permanent employees in fiscal 2026, and in fiscal 2023, as percentages?
+    type: number
+    accepted: ["12.6 and 20.9"]
+    page: 144
+    other_page: 135
+
+  # --- Two figures from one report ------------------------------------------
+  - id: yoy-dividend
+    category: same_report
+    question: What was Infosys's total dividend per share for fiscal 2026, and for fiscal 2025, in ₹?
+    type: number
+    accepted: ["48 and 43"]
+    page: 38
+
+  # --- A difference no page states -------------------------------------------
+  - id: calc-employees-change
+    category: calculation
+    question: By how many did Infosys's total employees, permanent and other than permanent, change from the end of fiscal 2025 to the end of fiscal 2026?
+    type: number
+    accepted: ["3,499", "3,034"]
+    page: 143
+    other_page: 134
+  - id: calc-patents-change
+    category: calculation
+    question: By how many patents did Infosys's portfolio grow from fiscal 2025 to fiscal 2026?
+    type: number
+    accepted: ["150"]
+    page: 25
+    other_page: 22
+  - id: calc-ceo-remuneration-change
+    category: calculation
+    question: By how much, in ₹ crore, did Salil Parekh's total remuneration rise from fiscal 2025 to fiscal 2026?
+    type: number
+    accepted: ["1.98"]
+    page: 116
+    other_page: 107

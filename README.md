@@ -23,10 +23,15 @@ It answers from the documents only. It does not give investment advice.
 2. **Retrieval** combines keyword and vector search, merges the two result
    lists with Reciprocal Rank Fusion, reranks, then hands the model the whole
    page each hit came from.
-3. **The agent** (LangGraph) retrieves and answers. If the model reports that
+3. **The agent** (LangGraph) first works out which companies, and which fiscal
+   years when two are named, the question is about, and searches each one's
+   reports separately so a comparison gets sources from every side. It then
+   retrieves and answers. If the model reports that
    the sources do not hold the answer, it rewrites the query and searches
    again. It then checks every figure in the answer against the cited pages,
-   without a model call, and searches again if one is missing.
+   without a model call, and searches again if one is missing. A figure the
+   answer worked out itself passes only when it is the sum, difference or
+   percentage change of two figures the answer states and the pages contain.
 4. **The API** (FastAPI) streams the agent's progress and the final answer to
    the web app as server-sent events.
 5. **The web app** (React) shows each step as it happens, the answer with its
@@ -60,7 +65,8 @@ It answers from the documents only. It does not give investment advice.
 - [x] Hybrid search and reranking
 - [x] LangGraph agent with query rewriting and number verification
 - [x] Web app: chat, live progress and cited-page viewer
-- [ ] 10–15 companies, model comparison, live demo
+- [x] A second year's report, with search split by company and year
+- [ ] More companies (TCS next), model comparison, live demo
 
 ## Run locally
 
@@ -257,10 +263,47 @@ What this does and does not show:
 - It shows the system finds and reads single facts across this report
   reliably, including from table-heavy pages, and declines to answer what is
   not there.
-- Every question asks for one fact from one page. Comparisons across years or
-  companies, and questions that need a calculation, are not covered yet.
-- It is still one report from one company. Other reports are laid out
-  differently and may parse worse.
+- Every question asks for one fact from one page.
+- It is still one company. Other reports are laid out differently and may
+  parse worse.
+
+**After adding the 2024-25 report.** With two years loaded, four questions
+that named no year were given one before the set was run again. The rerun
+scored **17/19**. Both misses are CSR questions where the search returned the
+CSR pages of the wrong year's report, which repeats the same section:
+
+- One answer declined, correctly, to give a 2025 figure as 2026's.
+- The other added two other figures to stand in for the missing total
+  (₹558.04 + ₹19.00 = ₹577.04 crore, against 577.36 on the page), and the
+  figure check accepted it as a worked figure. The answer prompt now forbids
+  combining figures to stand in for one the sources do not state.
+
+That prompt change was prompted by this run, so this set is no longer fully
+held out. A fresh set comes with the next company.
+
+### Comparison questions (4 October 2026)
+
+`backend/evals/comparison.yaml` holds 11 questions about Infosys across fiscal
+years, most needing one figure from each of the 2025-26 and 2024-25 reports,
+and three needing a difference no page states. It is used to improve the
+system, so it is not held out.
+
+| Category                          | Correct     |
+| --------------------------------- | ----------- |
+| Two years, one figure from each report | 6/7    |
+| Two years, both in one report     | 1/1         |
+| A difference to work out          | 2/3         |
+| **Overall**                       | **9/11 (82%)** |
+
+- The first run scored 8/11. Between the two runs the search was split by
+  year, the figure check learned to accept worked figures, and two ambiguous
+  questions were tightened, so the gain is not down to one change alone.
+- Both misses are retrieval misses: the page for one of the two years was not
+  among the sources, and the agent said so rather than guessing.
+- "Retrieved" and "supported" are not meaningful for the difference questions,
+  since the answer is a number no page prints.
+
+The original 35 questions still score 35/35 with both reports loaded.
 
 ## Repository layout
 

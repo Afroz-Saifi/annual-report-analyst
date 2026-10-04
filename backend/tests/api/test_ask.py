@@ -121,8 +121,9 @@ async def test_ask_stream_sends_each_step_and_then_the_answer(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     events = parse_events(response.text)
-    assert [name for name, _ in events] == ["step", "step", "step", "answer"]
+    assert [name for name, _ in events] == ["step", "step", "step", "step", "answer"]
     assert [data["step"] for name, data in events if name == "step"] == [
+        "scope",
         "retrieve",
         "answer",
         "verify",
@@ -142,4 +143,4 @@ async def test_ask_stream_reports_a_model_failure_as_an_error_event(
     assert response.status_code == 200
     events = parse_events(response.text)
     assert events[-1] == ("error", {"detail": "The language model request failed."})
-    assert [name for name, _ in events[:-1]] == ["step"]
+    assert [data["step"] for _, data in events[:-1]] == ["scope", "retrieve"]

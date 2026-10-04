@@ -1,7 +1,9 @@
 # Held-out questions for the Infosys Integrated Annual Report 2025-26.
 #
 # These were written after the system was built (commit f5f8195) and are never
-# used to decide what to change. They exist to give an accuracy figure that
+# used to decide what to change. When a second year's report was added, four
+# questions that named no year were given one, before this set was run again,
+# so that each still has a single right answer. They exist to give an accuracy figure that
 # the system has not been tuned towards. Do not fix the system against
 # individual questions here: add new questions instead.
 #
@@ -75,7 +77,7 @@ questions:
     page: 36
   - id: ho-buyback-board-date
     category: boards_report
-    question: On what date did the Board approve the proposal to buy back shares?
+    question: On what date did the Board approve the proposal for the fiscal 2026 share buyback?
     type: text
     accepted: ["September 11, 2025", "11 September 2025", "11th September 2025", "September 11th, 2025"]
     page: 36
@@ -83,19 +85,19 @@ questions:
   # --- CSR annexure -------------------------------------------------------------
   - id: ho-csr-obligation
     category: csr
-    question: What was Infosys's total CSR obligation for the financial year, in ₹ crore?
+    question: What was Infosys's total CSR obligation for fiscal 2026, in ₹ crore?
     type: number
     accepted: ["577.36"]
     page: 65
   - id: ho-csr-admin-overheads
     category: csr
-    question: How much did Infosys spend on administrative overheads for CSR, in ₹ crore?
+    question: How much did Infosys spend on administrative overheads for CSR in fiscal 2026, in ₹ crore?
     type: number
     accepted: ["9.25"]
     page: 65
   - id: ho-csr-average-profit
     category: csr
-    question: What was the average net profit of the Company under sub-section (5) of Section 135, in ₹ crore?
+    question: For fiscal 2026 CSR, what was Infosys's average net profit under sub-section (5) of Section 135, in ₹ crore?
     type: number
     accepted: ["28,848.03"]
     page: 65

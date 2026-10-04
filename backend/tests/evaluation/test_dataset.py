@@ -8,12 +8,11 @@ from app.evaluation.dataset import EvalDataset, EvalQuestion, load_dataset
 EVALS = Path(__file__).parents[2] / "evals"
 
 
-@pytest.mark.parametrize("name", ["questions.yaml", "heldout.yaml"])
+@pytest.mark.parametrize("name", ["questions.yaml", "heldout.yaml", "comparison.yaml"])
 def test_the_committed_question_sets_load(name: str) -> None:
     dataset = load_dataset(EVALS / name)
 
-    assert len(dataset.questions) >= 15
-    assert any(not question.answerable for question in dataset.questions)
+    assert len(dataset.questions) >= 10
     assert all(question.page for question in dataset.questions if question.answerable)
 
 

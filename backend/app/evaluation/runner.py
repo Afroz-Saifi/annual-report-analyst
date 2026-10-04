@@ -65,11 +65,13 @@ async def evaluate_question(
     cited = [sources[citation.source - 1] for citation in response.citations]
     if question.answerable:
         correct = contains_accepted_answer(question, response.answer)
-        retrieved: bool | None = any(
-            contains_accepted_answer(question, source.content) for source in sources
+        # Taken across all the sources together, since a comparison draws its
+        # figures from several pages.
+        retrieved: bool | None = contains_accepted_answer(
+            question, "\n".join(source.content for source in sources)
         )
-        supported: bool | None = correct and any(
-            contains_accepted_answer(question, source.content) for source in cited
+        supported: bool | None = correct and contains_accepted_answer(
+            question, "\n".join(source.content for source in cited)
         )
     else:
         # The right response to an unanswerable question is to cite nothing.

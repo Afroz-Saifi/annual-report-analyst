@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import replace
 
 from sqlalchemy import select, tuple_
@@ -24,9 +25,13 @@ class PageExpandingRetriever:
         self._inner = inner
 
     async def retrieve(
-        self, session: AsyncSession, question: str, limit: int
+        self,
+        session: AsyncSession,
+        question: str,
+        limit: int,
+        report_ids: Sequence[int] | None = None,
     ) -> list[RetrievedChunk]:
-        hits = await self._inner.retrieve(session, question, limit)
+        hits = await self._inner.retrieve(session, question, limit, report_ids)
         first_hit_per_page: dict[tuple[int, int], RetrievedChunk] = {}
         for hit in hits:
             first_hit_per_page.setdefault((hit.report_id, hit.page_number), hit)

@@ -13,6 +13,8 @@ class EvalQuestion(BaseModel):
     type: Literal["number", "text"] = "number"
     accepted: list[str] = []
     page: int | None = None
+    # A second page for answers drawn from two reports.
+    other_page: int | None = None
 
     @model_validator(mode="after")
     def answerable_questions_need_an_accepted_answer(self) -> Self:

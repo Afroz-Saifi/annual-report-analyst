@@ -35,12 +35,15 @@ def ingest(
     raw_dir: Annotated[Path, typer.Option(help="Folder holding the downloaded PDFs.")] = Path(
         "../data/raw"
     ),
+    force: Annotated[
+        bool, typer.Option(help="Re-ingest reports even when their file has not changed.")
+    ] = False,
 ) -> None:
     """Parse, chunk, embed and store every report in the manifest."""
-    asyncio.run(_ingest(manifest, raw_dir))
+    asyncio.run(_ingest(manifest, raw_dir, force))
 
 
-async def _ingest(manifest_path: Path, raw_dir: Path) -> None:
+async def _ingest(manifest_path: Path, raw_dir: Path, force: bool) -> None:
     entries = load_manifest(manifest_path).reports
     embeddings = LocalEmbeddings(get_settings().embedding_model)
     try:
@@ -52,7 +55,7 @@ async def _ingest(manifest_path: Path, raw_dir: Path) -> None:
                 continue
             started = time.perf_counter()
             async with SessionLocal() as session:
-                result = await ingest_report(session, embeddings, entry, pdf_path)
+                result = await ingest_report(session, embeddings, entry, pdf_path, force)
             if result.status == "unchanged":
                 typer.echo(f"{label}: already ingested, file unchanged")
                 continue

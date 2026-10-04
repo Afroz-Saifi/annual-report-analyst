@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Sequence
 from dataclasses import replace
 from typing import Literal, Protocol
 
@@ -20,8 +21,14 @@ RERANK_POOL = 30
 
 
 class Retriever(Protocol):
+    """Finds the sources best matching a question, optionally within some reports only."""
+
     async def retrieve(
-        self, session: AsyncSession, question: str, limit: int
+        self,
+        session: AsyncSession,
+        question: str,
+        limit: int,
+        report_ids: Sequence[int] | None = None,
     ) -> list[RetrievedChunk]: ...
 
 
@@ -30,9 +37,13 @@ class VectorRetriever:
         self._embeddings = embeddings
 
     async def retrieve(
-        self, session: AsyncSession, question: str, limit: int
+        self,
+        session: AsyncSession,
+        question: str,
+        limit: int,
+        report_ids: Sequence[int] | None = None,
     ) -> list[RetrievedChunk]:
-        return await search_by_meaning(session, self._embeddings, question, limit)
+        return await search_by_meaning(session, self._embeddings, question, limit, report_ids)
 
 
 class HybridRetriever:
@@ -43,12 +54,16 @@ class HybridRetriever:
         self._reranker = reranker
 
     async def retrieve(
-        self, session: AsyncSession, question: str, limit: int
+        self,
+        session: AsyncSession,
+        question: str,
+        limit: int,
+        report_ids: Sequence[int] | None = None,
     ) -> list[RetrievedChunk]:
         by_meaning = await search_by_meaning(
-            session, self._embeddings, question, CANDIDATES_PER_SEARCH
+            session, self._embeddings, question, CANDIDATES_PER_SEARCH, report_ids
         )
-        by_keywords = await search_by_keywords(session, question, CANDIDATES_PER_SEARCH)
+        by_keywords = await search_by_keywords(session, question, CANDIDATES_PER_SEARCH, report_ids)
         fused = reciprocal_rank_fusion([by_meaning, by_keywords])
         if self._reranker is None:
             return fused[:limit]

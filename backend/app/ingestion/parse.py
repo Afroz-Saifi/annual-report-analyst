@@ -18,7 +18,7 @@ def parse_pdf(path: Path) -> list[ParsedPage]:
         return [
             ParsedPage(
                 number=number,
-                text=page.extract_text() or "",
+                text=fix_rupee_sign(page.extract_text() or ""),
                 tables=[
                     table_to_markdown(table)
                     for table in page.extract_tables()
@@ -27,6 +27,12 @@ def parse_pdf(path: Path) -> list[ParsedPage]:
             )
             for number, page in enumerate(pdf.pages, start=1)
         ]
+
+
+def fix_rupee_sign(text: str) -> str:
+    # Many Indian reports draw ₹ with a font that maps the glyph to a backtick,
+    # so "`1,78,650 crore" is extracted where the page shows "₹1,78,650 crore".
+    return text.replace("`", "₹")
 
 
 def is_usable_table(table: Table) -> bool:
@@ -44,7 +50,7 @@ def table_to_markdown(table: Table) -> str:
 
 
 def _clean(cell: str | None) -> str:
-    return " ".join((cell or "").split()).replace("|", "\\|")
+    return fix_rupee_sign(" ".join((cell or "").split())).replace("|", "\\|")
 
 
 def _row(cells: list[str]) -> str:

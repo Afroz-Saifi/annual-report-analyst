@@ -1,9 +1,14 @@
 """The question-answering agent.
 
-    retrieve -> answer -> verify -> done
-       ^          |          |
-       |          v          v
-       +------ rewrite <-----+
+    scope -> retrieve -> answer -> verify -> done
+                ^          |          |
+                |          v          v
+                +------ rewrite <-----+
+
+The scope step finds the companies, and any two or more fiscal years, that the
+question names. Each one's reports are then searched separately and the results
+interleaved, so a comparison gets sources from every side rather than from
+whichever company or year ranks highest.
 
 The answer step doubles as the grader: when it reports that the sources do not
 contain the answer, the graph rewrites the query and searches again. The verify
@@ -20,10 +25,13 @@ from typing import Annotated, Any, Literal, TypedDict, cast
 from langgraph.graph import START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.rewrite import QueryRewriter
-from app.agent.verify import unsupported_figures
+from app.agent.scope import KnownReport, plan_search
+from app.agent.verify import check_figures
+from app.db.models import Report
 from app.qa.baseline import (
     NO_REPORTS_ANSWER,
     AnswerGenerationError,
@@ -46,6 +54,8 @@ class AgentContext:
 
 class AgentState(TypedDict):
     question: str
+    # One list of report ids per company or year searched separately; empty searches all.
+    scopes: list[list[int]]
     queries: list[str]
     tried: Annotated[list[str], operator.add]
     rewrites: int
@@ -61,11 +71,30 @@ Agent = CompiledStateGraph[AgentState, AgentContext, AgentState, AgentState]
 def build_agent(
     retriever: Retriever, generator: AnswerGenerator, rewriter: QueryRewriter, max_rewrites: int
 ) -> Agent:
+    async def scope(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
+        rows = await runtime.context.session.execute(
+            select(Report.id, Report.company, Report.ticker, Report.fiscal_year)
+        )
+        reports = [KnownReport(*row) for row in rows]
+        plan = plan_search(state["question"], reports)
+        if len(plan) > 1:
+            detail = f"Searching {' and '.join(scope.label for scope in plan)} separately."
+        elif plan:
+            detail = f"Searching the reports of {plan[0].label}."
+        else:
+            detail = "No company named, so searching every report."
+        return {
+            "scopes": [scope.report_ids for scope in plan],
+            "steps": [AgentStep(step="scope", detail=detail)],
+        }
+
     async def retrieve(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
         context = runtime.context
+        scopes: list[list[int] | None] = list(state["scopes"]) or [None]
         rankings = [
-            await retriever.retrieve(context.session, query, context.top_k)
+            await retriever.retrieve(context.session, query, context.top_k, report_ids)
             for query in state["queries"]
+            for report_ids in scopes
         ]
         sources = reciprocal_rank_fusion(rankings)[: context.top_k]
         detail = f"Found {len(sources)} sources for: {'; '.join(state['queries'])}"
@@ -105,12 +134,16 @@ def build_agent(
         if draft is None or not draft.found:
             return {"unverified": []}
         cited = [sources[n - 1] for n in draft.citations if 1 <= n <= len(sources)]
-        unverified = unsupported_figures(draft.answer, state["question"], cited)
-        detail = (
-            f"Not found in the cited sources: {', '.join(unverified)}"
-            if unverified
-            else "Every figure in the answer appears in a cited source."
-        )
+        check = check_figures(draft.answer, state["question"], cited)
+        unverified = check.unsupported
+        if unverified:
+            detail = f"Not found in the cited sources: {', '.join(unverified)}"
+        elif check.derived:
+            detail = "Every figure is in a cited source or worked out from them: " + "; ".join(
+                check.derived.values()
+            )
+        else:
+            detail = "Every figure in the answer appears in a cited source."
         return {"unverified": unverified, "steps": [AgentStep(step="verify", detail=detail)]}
 
     def after_verify(state: AgentState) -> Literal["rewrite", "__end__"]:
@@ -119,11 +152,13 @@ def build_agent(
         return "__end__"
 
     graph = StateGraph(AgentState, context_schema=AgentContext)
+    graph.add_node("scope", scope)
     graph.add_node("retrieve", retrieve)
     graph.add_node("answer", answer)
     graph.add_node("rewrite", rewrite)
     graph.add_node("verify", verify)
-    graph.add_edge(START, "retrieve")
+    graph.add_edge(START, "scope")
+    graph.add_edge("scope", "retrieve")
     graph.add_edge("retrieve", "answer")
     graph.add_conditional_edges("answer", after_answer)
     graph.add_edge("rewrite", "retrieve")
@@ -140,6 +175,7 @@ class AgentPipeline:
     ) -> AsyncIterator[AgentStep | FinalAnswer]:
         state: AgentState = {
             "question": question,
+            "scopes": [],
             "queries": [question],
             "tried": [],
             "rewrites": 0,

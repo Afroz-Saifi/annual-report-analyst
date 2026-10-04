@@ -48,3 +48,14 @@ async def test_the_reranker_decides_the_final_order(db_session: AsyncSession) ->
 
     assert results[0].page_number == 3
     assert results[0].score == 1.0
+
+
+async def test_retrieval_can_be_limited_to_some_reports(db_session: AsyncSession) -> None:
+    await seed_report(db_session)
+    retriever = HybridRetriever(AxisEmbeddings(query_axis=1))
+
+    inside = await retriever.retrieve(db_session, "voluntary attrition", 3, report_ids=[1])
+    outside = await retriever.retrieve(db_session, "voluntary attrition", 3, report_ids=[999])
+
+    assert len(inside) == 3
+    assert outside == []

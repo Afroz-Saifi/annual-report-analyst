@@ -191,13 +191,13 @@ questions:
     page: 143
   - id: esg-patents
     category: people
-    question: How many patents, granted or pending, were in Infosys's portfolio?
+    question: How many patents, granted or pending, were in Infosys's portfolio in fiscal 2026?
     type: number
     accepted: ["973"]
     page: 25
   - id: esg-nationalities
     category: people
-    question: How many nationalities were represented in Infosys's workforce?
+    question: How many nationalities were represented in Infosys's workforce in fiscal 2026?
     type: number
     accepted: ["155"]
     page: 25

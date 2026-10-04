@@ -13,3 +13,8 @@ reports:
     fiscal_year: 2026
     source_url: https://www.infosys.com/investors/reports-filings/annual-report/annual/documents/infosys-ar-26.pdf
     file: infosys-ar-26.pdf
+  - company: Infosys
+    ticker: INFY
+    fiscal_year: 2025
+    source_url: https://www.infosys.com/investors/reports-filings/annual-report/annual/documents/infosys-ar-25.pdf
+    file: infosys-ar-25.pdf

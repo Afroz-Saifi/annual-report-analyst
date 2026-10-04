@@ -2,11 +2,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.graph import AgentPipeline, build_agent
+from app.db.models import Chunk, Report
 from app.qa.baseline import DraftAnswer, answer_question
 from app.retrieval.retriever import HybridRetriever
 from app.retrieval.types import RetrievedChunk
 from app.schemas.ask import AskResponse
-from tests.fakes import AxisEmbeddings, FakeAnswerGenerator, FakeQueryRewriter
+from tests.fakes import AxisEmbeddings, FakeAnswerGenerator, FakeQueryRewriter, axis_vector
 from tests.retrieval.seed import seed_report
 
 pytestmark = pytest.mark.anyio
@@ -52,7 +53,7 @@ async def test_an_answer_found_on_the_first_search_needs_no_rewrite(
     response, sources = await ask(pipeline(generator, rewriter), db_session, "revenue")
 
     assert response.answer == "Revenue grew [1]."
-    assert [step.step for step in response.steps] == ["retrieve", "answer", "verify"]
+    assert [step.step for step in response.steps] == ["scope", "retrieve", "answer", "verify"]
     assert [citation.page_number for citation in response.citations] == [1]
     assert response.verified is True
     assert rewriter.calls == []
@@ -71,6 +72,7 @@ async def test_a_missed_answer_is_found_after_rewriting_the_query(
     )
 
     assert [step.step for step in response.steps] == [
+        "scope",
         "retrieve",
         "answer",
         "rewrite",
@@ -136,6 +138,7 @@ async def test_an_unverified_figure_sends_the_agent_back_to_search(
     )
 
     assert [step.step for step in response.steps] == [
+        "scope",
         "retrieve",
         "answer",
         "verify",
@@ -158,3 +161,68 @@ async def test_an_empty_database_answers_without_calling_the_model(
 
     assert response.answer == "No reports have been ingested yet."
     assert (sources, generator.calls, rewriter.calls) == ([], [], [])
+
+
+async def seed_two_companies(session: AsyncSession) -> None:
+    """Four pages from Alpha, then one from Beta, all equally close to every query."""
+    for company, ticker, pages in (("Alpha Ltd", "ALPHA", 4), ("Beta Corp", "BETA", 1)):
+        session.add(
+            Report(
+                company=company,
+                ticker=ticker,
+                fiscal_year=2026,
+                source_url=f"https://example.com/{ticker}.pdf",
+                file_sha256=ticker.ljust(64, "0"),
+                page_count=pages,
+                chunks=[
+                    Chunk(
+                        page_number=page,
+                        chunk_index=page,
+                        kind="text",
+                        content=f"{company} revenue for the year, page {page}.",
+                        embedding=axis_vector(0),
+                    )
+                    for page in range(1, pages + 1)
+                ],
+            )
+        )
+    await session.commit()
+
+
+async def test_a_question_naming_two_companies_gets_sources_from_both(
+    db_session: AsyncSession,
+) -> None:
+    await seed_two_companies(db_session)
+    generator = FakeAnswerGenerator(NOT_FOUND)
+    agent = pipeline(generator, FakeQueryRewriter(), max_rewrites=0)
+
+    final = await answer_question(agent, db_session, "Compare Alpha Ltd and BETA revenue", 2)
+
+    assert final.response.steps[0].detail == "Searching Alpha Ltd and Beta Corp separately."
+    assert {source.company for source in final.sources} == {"Alpha Ltd", "Beta Corp"}
+
+
+async def test_a_question_naming_one_company_searches_only_its_reports(
+    db_session: AsyncSession,
+) -> None:
+    await seed_two_companies(db_session)
+    generator = FakeAnswerGenerator(NOT_FOUND)
+    agent = pipeline(generator, FakeQueryRewriter(), max_rewrites=0)
+
+    final = await answer_question(agent, db_session, "What was Beta Corp's revenue?", 3)
+
+    assert final.response.steps[0].detail == "Searching the reports of Beta Corp."
+    assert {source.company for source in final.sources} == {"Beta Corp"}
+
+
+async def test_a_question_naming_no_company_searches_every_report(
+    db_session: AsyncSession,
+) -> None:
+    await seed_two_companies(db_session)
+    generator = FakeAnswerGenerator(NOT_FOUND)
+    agent = pipeline(generator, FakeQueryRewriter(), max_rewrites=0)
+
+    final = await answer_question(agent, db_session, "What was revenue for the year?", 5)
+
+    assert final.response.steps[0].detail == "No company named, so searching every report."
+    assert {source.company for source in final.sources} == {"Alpha Ltd", "Beta Corp"}

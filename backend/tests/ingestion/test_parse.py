@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from app.ingestion.parse import Table, is_usable_table, parse_pdf, table_to_markdown
+from app.ingestion.parse import (
+    Table,
+    fix_rupee_sign,
+    is_usable_table,
+    parse_pdf,
+    table_to_markdown,
+)
 
 
 def test_table_to_markdown_builds_header_and_rows() -> None:
@@ -15,6 +21,18 @@ def test_table_to_markdown_cleans_cells_and_pads_short_rows() -> None:
     table: Table = [["Line\nitem", "A|B"], [None]]
 
     assert table_to_markdown(table) == "| Line item | A\\|B |\n| --- | --- |\n|  |  |"
+
+
+def test_a_backtick_drawn_for_the_rupee_sign_becomes_the_rupee_sign() -> None:
+    assert fix_rupee_sign("Revenue of `1,78,650 crore (In ` crore)") == (
+        "Revenue of ₹1,78,650 crore (In ₹ crore)"
+    )
+
+
+def test_table_cells_get_the_rupee_sign_too() -> None:
+    table: Table = [["Item", "Amount"], ["Dividend", "`25.00"]]
+
+    assert "| Dividend | ₹25.00 |" in table_to_markdown(table)
 
 
 def test_single_row_or_single_column_tables_are_not_usable() -> None:

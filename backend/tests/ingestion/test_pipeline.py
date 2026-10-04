@@ -67,6 +67,17 @@ async def test_re_running_records_a_file_name_missing_from_an_older_ingest(
     assert report.file_name == "sample-report.pdf"
 
 
+async def test_force_re_ingests_an_unchanged_file(
+    db_session: AsyncSession, sample_pdf: Path
+) -> None:
+    await ingest_report(db_session, FakeEmbeddings(), ENTRY, sample_pdf)
+
+    result = await ingest_report(db_session, FakeEmbeddings(), ENTRY, sample_pdf, force=True)
+
+    assert result.status == "ingested"
+    assert await db_session.scalar(select(func.count()).select_from(Report)) == 1
+
+
 @pytest.fixture
 def revised_pdf(sample_pdf: Path, tmp_path: Path) -> Path:
     path = tmp_path / "revised.pdf"

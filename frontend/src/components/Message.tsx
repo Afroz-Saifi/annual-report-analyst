@@ -10,6 +10,7 @@ export type Exchange = {
 }
 
 const STEP_LABELS: Record<string, string> = {
+  scope: 'Picked the reports',
   retrieve: 'Searched the reports',
   answer: 'Read the sources',
   rewrite: 'Tried different searches',
