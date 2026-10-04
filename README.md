@@ -38,7 +38,8 @@ It answers from the documents only. It does not give investment advice.
 | LLM        | Gemini (provider is a config setting)              |
 | Database   | PostgreSQL with pgvector, SQLAlchemy, Alembic      |
 | Retrieval  | Hybrid search, Reciprocal Rank Fusion, reranker    |
-| PDF parsing| PyMuPDF, Docling                                   |
+| PDF parsing| pdfplumber (text and tables)                       |
+| Embeddings | BGE small, run locally with fastembed              |
 | Evaluation | pytest and a hand-checked question set             |
 | Frontend   | React, Vite, TypeScript                            |
 | Tooling    | uv, Ruff, mypy, Docker Compose, GitHub Actions     |
@@ -47,7 +48,7 @@ It answers from the documents only. It does not give investment advice.
 
 - [x] Repository skeleton
 - [x] Backend runs: FastAPI health endpoint, PostgreSQL with pgvector in Docker
-- [ ] Ingest one report end to end
+- [ ] Ingest one report end to end (pipeline built; first real report pending)
 - [ ] Plain question answering with page citations
 - [ ] Evaluation set and baseline accuracy score
 - [ ] Hybrid search and reranking
@@ -64,6 +65,7 @@ docker compose up -d db            # PostgreSQL with pgvector on port 5440
 cd backend
 cp .env.example .env
 uv sync                            # installs Python 3.12 and the dependencies
+uv run alembic upgrade head        # creates the tables
 uv run uvicorn app.main:app --reload
 ```
 
@@ -78,9 +80,28 @@ Run the checks from `backend/`:
 
 ```bash
 uv run ruff check . && uv run ruff format --check .
-uv run mypy app tests
+uv run mypy app tests migrations
 uv run pytest
 ```
+
+The database tests run when PostgreSQL is up and are skipped when it is not.
+
+## Ingest reports
+
+Company websites block scripted downloads, so reports are downloaded by hand:
+
+1. Download the annual report PDF from the company's investor page into
+   `data/raw/`.
+2. Add an entry for it to `data/reports.yaml`.
+3. From `backend/`, run:
+
+```bash
+uv run python -m app.cli ingest
+```
+
+Each report is parsed page by page, split into text and table chunks,
+embedded locally and stored with its page number. Running the command again
+skips reports whose file has not changed.
 
 ## Repository layout
 

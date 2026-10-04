@@ -1,0 +1,10 @@
+# Annual reports to ingest. Download each PDF by hand from the company's
+# investor page into data/raw/ (company sites block scripted downloads), then
+# list it here and run `uv run python -m app.cli ingest` from backend/.
+#
+# - company: Example Ltd
+#   ticker: EXAMPLE
+#   fiscal_year: 2025          # the year the financial year ends
+#   source_url: https://example.com/annual-report-2025.pdf
+#   file: example-ar-2025.pdf  # file name inside data/raw/
+reports: []
