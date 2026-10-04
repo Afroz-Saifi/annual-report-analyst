@@ -3,7 +3,8 @@
 # These were written after the system was built (commit f5f8195) and are never
 # used to decide what to change. When a second year's report was added, four
 # questions that named no year were given one, before this set was run again,
-# so that each still has a single right answer. They exist to give an accuracy figure that
+# so that each still has a single right answer. Likewise, when a second company
+# was added, questions that named no company were prefixed "For Infosys,". They exist to give an accuracy figure that
 # the system has not been tuned towards. Do not fix the system against
 # individual questions here: add new questions instead.
 #
@@ -19,19 +20,19 @@ questions:
     page: 209
   - id: ho-standalone-profit
     category: financial_statement
-    question: In the Standalone Statement of Profit and Loss, what was the profit for the year ended March 31, 2026, in ₹ crore?
+    question: For Infosys, in the Standalone Statement of Profit and Loss, what was the profit for the year ended March 31, 2026, in ₹ crore?
     type: number
     accepted: ["29,211"]
     page: 209
   - id: ho-standalone-other-income
     category: financial_statement
-    question: What was other income, net, on a standalone basis for the year ended March 31, 2026, in ₹ crore?
+    question: For Infosys, what was other income, net, on a standalone basis for the year ended March 31, 2026, in ₹ crore?
     type: number
     accepted: ["6,491"]
     page: 209
   - id: ho-standalone-labour-codes
     category: financial_statement
-    question: What was the exceptional item for the impact of the Labour Codes in the standalone financial statements for fiscal 2026, in ₹ crore?
+    question: For Infosys, what was the exceptional item for the impact of the Labour Codes in the standalone financial statements for fiscal 2026, in ₹ crore?
     type: number
     accepted: ["1,146"]
     page: 209
@@ -65,7 +66,7 @@ questions:
     page: 36
   - id: ho-cash-investments-fy25
     category: boards_report
-    question: What were consolidated cash and investments as on March 31, 2025, in ₹ crore?
+    question: For Infosys, what were consolidated cash and investments as on March 31, 2025, in ₹ crore?
     type: number
     accepted: ["47,549"]
     page: 36
@@ -77,7 +78,7 @@ questions:
     page: 36
   - id: ho-buyback-board-date
     category: boards_report
-    question: On what date did the Board approve the proposal for the fiscal 2026 share buyback?
+    question: For Infosys, on what date did the Board approve the proposal for the fiscal 2026 share buyback?
     type: text
     accepted: ["September 11, 2025", "11 September 2025", "11th September 2025", "September 11th, 2025"]
     page: 36

@@ -29,6 +29,18 @@ def test_a_backtick_drawn_for_the_rupee_sign_becomes_the_rupee_sign() -> None:
     )
 
 
+def test_letters_a_report_draws_as_the_rupee_sign_are_replaced_only_where_it_belongs() -> None:
+    text = "Revenue H2,67,021 crore (H crores), (J in crore), EPS (J) and H1 each; UDIN F327H052"
+
+    assert fix_rupee_sign(text, ["H", "J"]) == (
+        "Revenue ₹2,67,021 crore (₹ crores), (₹ in crore), EPS (₹) and ₹1 each; UDIN F327H052"
+    )
+
+
+def test_letters_are_left_alone_unless_the_report_says_so() -> None:
+    assert fix_rupee_sign("Results for H1 2026") == "Results for H1 2026"
+
+
 def test_table_cells_get_the_rupee_sign_too() -> None:
     table: Table = [["Item", "Amount"], ["Dividend", "`25.00"]]
 

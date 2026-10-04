@@ -1,6 +1,7 @@
 # Annual Report Analyst
 
-Ask questions across the annual reports of Indian listed companies and get
+Ask questions across the annual reports of Indian listed companies (currently
+Infosys 2025-26 and 2024-25, and TCS 2025-26) and get
 answers with page-level citations, where every number is checked against its
 source page.
 
@@ -66,7 +67,8 @@ It answers from the documents only. It does not give investment advice.
 - [x] LangGraph agent with query rewriting and number verification
 - [x] Web app: chat, live progress and cited-page viewer
 - [x] A second year's report, with search split by company and year
-- [ ] More companies (TCS next), model comparison, live demo
+- [x] A second company (TCS) and cross-company questions
+- [ ] Model comparison, more companies, live demo
 
 ## Run locally
 
@@ -113,7 +115,13 @@ uv run python -m app.cli ingest
 
 Each report is parsed page by page, split into text and table chunks,
 embedded locally and stored with its page number. Running the command again
-skips reports whose file has not changed.
+skips reports whose file has not changed; `--force` re-ingests them anyway.
+
+Some reports draw the ₹ sign with a font that extracts as a letter, such as
+"H2,67,021 crore" in the TCS report. List those letters for that report under
+`rupee_glyphs` in `data/reports.yaml`; they are replaced only before a figure
+or in a unit label such as "(H crore)". A backtick drawn for ₹ is always
+replaced.
 
 ## Run the web app
 
@@ -280,6 +288,44 @@ CSR pages of the wrong year's report, which repeats the same section:
 
 That prompt change was prompted by this run, so this set is no longer fully
 held out. A fresh set comes with the next company.
+
+### With a second company: TCS (4 October 2026)
+
+Adding the TCS 2025-26 report needed two parser changes: a wider character
+spacing tolerance, because TCS's fonts space the digits of a figure so widely
+that "6,17,437" was extracted as "6,17 ,437", and the per-report ₹ letters
+above. Neither changed the text extracted from the Infosys reports.
+
+Questions that named no company were prefixed "For Infosys," before any run
+with TCS loaded.
+
+| Question set                                   | Questions | Correct           |
+| ---------------------------------------------- | --------- | ----------------- |
+| **Second held-out set, single run**            | 15        | **15/15 (100%)**  |
+| Infosys versus TCS (`cross_company.yaml`)      | 9         | 7/9 (78%)         |
+| Infosys across years (`comparison.yaml`)       | 11        | 9/11 (82%)        |
+| Original questions (`questions.yaml`)          | 35        | 35/35 (100%)      |
+| First held-out set (`heldout.yaml`)            | 19        | 18/19 (95%)       |
+
+The second held-out set (`backend/evals/heldout_v2.yaml`) was written after
+TCS was added and before the system was run on it, and has not been used to
+change anything. It covers single facts from the TCS report, single facts from
+pages of the Infosys 2024-25 report no other set uses, three Infosys-versus-TCS
+comparisons and two questions the reports cannot answer. Like the first set,
+every answerable question asks for figures printed on a page.
+
+The two cross-company misses picked a different line item from the one asked
+for, both on the Infosys side:
+
+- Asked for consolidated profit for the year (₹29,474 crore), it gave net
+  profit attributable to owners from the IFRS highlights page (₹29,440 crore),
+  labelled as such.
+- Asked for consolidated employee benefit expenses (₹95,094 crore), it gave
+  ₹96,383 crore from a note that adds the Labour Codes exceptional item.
+
+Known gaps in the TCS text: 64 chunks, including the CSR annexure, come from
+pages whose font pdfplumber cannot decode at all, and the attrition figure sits
+inside a graphic whose text is scrambled. No question relies on them.
 
 ### Comparison questions (4 October 2026)
 

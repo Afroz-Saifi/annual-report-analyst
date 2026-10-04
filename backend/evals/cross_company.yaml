@@ -1,0 +1,72 @@
+# Questions comparing Infosys and Tata Consultancy Services (TCS) for fiscal
+# 2026. Each answer needs one figure from each company's 2025-26 annual report.
+# `page` is the page in the Infosys report and `other_page` the page in the TCS
+# report (PDF page positions).
+#
+# This set may be used to improve the system, so it is not held out.
+
+questions:
+  - id: xc-revenue
+    category: cross_company
+    question: What was consolidated revenue from operations for fiscal 2026 at Infosys and at TCS, in ₹ crore?
+    type: number
+    accepted: ["1,78,650 and 2,67,021"]
+    page: 287
+    other_page: 167
+  - id: xc-profit
+    category: cross_company
+    question: What was consolidated profit for the year for fiscal 2026 at Infosys and at TCS, in ₹ crore?
+    type: number
+    accepted: ["29,474 and 49,454"]
+    page: 287
+    other_page: 167
+  - id: xc-employee-cost
+    category: cross_company
+    question: What were consolidated employee benefit expenses for fiscal 2026 at Infosys and at TCS, in ₹ crore?
+    type: number
+    accepted: ["95,094 and 1,54,994"]
+    page: 287
+    other_page: 167
+  - id: xc-total-assets
+    category: cross_company
+    question: What were consolidated total assets as at March 31, 2026 for Infosys and for TCS, in ₹ crore?
+    type: number
+    accepted: ["1,55,967 and 1,82,372"]
+    page: 285
+    other_page: 166
+  - id: xc-eps
+    category: cross_company
+    question: What was basic earnings per share for fiscal 2026 at Infosys and at TCS, in ₹?
+    type: number
+    accepted: ["71.58 and 136.01"]
+    page: 288
+    other_page: 167
+  - id: xc-total-dividend
+    category: cross_company
+    question: What was the total dividend per share for fiscal 2026 at Infosys and at TCS, in ₹?
+    type: number
+    accepted: ["48 and 110"]
+    page: 38
+    other_page: 36
+  - id: xc-total-employees
+    category: cross_company
+    question: How many total employees, permanent and other than permanent, did Infosys and TCS each have at the end of fiscal 2026?
+    type: number
+    # Infosys prints two totals for the year end in different tables.
+    accepted: ["3,52,095 and 6,17,437", "3,51,630 and 6,17,437"]
+    page: 143
+    other_page: 108
+  - id: xc-differently-abled
+    category: cross_company
+    question: How many differently-abled employees did Infosys and TCS each report at the end of fiscal 2026?
+    type: number
+    accepted: ["1,075 and 1,082"]
+    page: 143
+    other_page: 108
+  - id: xc-calc-revenue-gap
+    category: cross_company_calculation
+    question: By how much did TCS's consolidated revenue from operations exceed Infosys's in fiscal 2026, in ₹ crore?
+    type: number
+    accepted: ["88,371"]
+    page: 287
+    other_page: 167

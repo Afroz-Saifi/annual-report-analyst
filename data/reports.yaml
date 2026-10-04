@@ -18,3 +18,10 @@ reports:
     fiscal_year: 2025
     source_url: https://www.infosys.com/investors/reports-filings/annual-report/annual/documents/infosys-ar-25.pdf
     file: infosys-ar-25.pdf
+  - company: Tata Consultancy Services
+    ticker: TCS
+    fiscal_year: 2026
+    source_url: https://www.tcs.com/content/dam/tcs/investor-relations/financial-statements/2025-26/ar/annual-report-2025-2026.pdf
+    file: tcs-ar-26.pdf
+    # TCS's fonts draw ₹ as H in figures and as J in some unit labels.
+    rupee_glyphs: [H, J]

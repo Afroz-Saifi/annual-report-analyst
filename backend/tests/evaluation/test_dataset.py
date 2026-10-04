@@ -8,19 +8,24 @@ from app.evaluation.dataset import EvalDataset, EvalQuestion, load_dataset
 EVALS = Path(__file__).parents[2] / "evals"
 
 
-@pytest.mark.parametrize("name", ["questions.yaml", "heldout.yaml", "comparison.yaml"])
+@pytest.mark.parametrize(
+    "name",
+    ["questions.yaml", "heldout.yaml", "comparison.yaml", "cross_company.yaml", "heldout_v2.yaml"],
+)
 def test_the_committed_question_sets_load(name: str) -> None:
     dataset = load_dataset(EVALS / name)
 
-    assert len(dataset.questions) >= 10
+    assert len(dataset.questions) >= 8
     assert all(question.page for question in dataset.questions if question.answerable)
 
 
-def test_the_two_question_sets_share_no_questions() -> None:
-    tuned = {q.question for q in load_dataset(EVALS / "questions.yaml").questions}
-    held_out = {q.question for q in load_dataset(EVALS / "heldout.yaml").questions}
+def test_no_question_appears_in_two_sets() -> None:
+    names = ["questions", "heldout", "comparison", "cross_company", "heldout_v2"]
+    questions = [
+        q.question for name in names for q in load_dataset(EVALS / f"{name}.yaml").questions
+    ]
 
-    assert tuned.isdisjoint(held_out)
+    assert len(questions) == len(set(questions))
 
 
 def test_an_answerable_question_needs_an_accepted_answer() -> None:

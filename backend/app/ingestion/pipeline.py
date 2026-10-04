@@ -49,7 +49,7 @@ async def ingest_report(
         await session.delete(existing)
         await session.flush()
 
-    pages = await asyncio.to_thread(parse_pdf, pdf_path)
+    pages = await asyncio.to_thread(parse_pdf, pdf_path, entry.rupee_glyphs)
     drafts = chunk_pages(pages)
     vectors = await asyncio.to_thread(
         embeddings.embed_documents, [draft.content for draft in drafts]

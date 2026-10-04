@@ -10,6 +10,8 @@ class ReportEntry(BaseModel):
     fiscal_year: int
     source_url: str
     file: str
+    # Letters this report's fonts draw as ₹; see parse_pdf.
+    rupee_glyphs: list[str] = []
 
 
 class Manifest(BaseModel):
