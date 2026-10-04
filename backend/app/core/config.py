@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import SecretStr
@@ -11,6 +12,7 @@ class Settings(BaseSettings):
     app_name: str = "Annual Report Analyst"
     environment: str = "development"
     database_url: str = "postgresql+asyncpg://analyst:analyst@localhost:5440/analyst"
+    raw_dir: Path = Path("../data/raw")
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     retrieval_mode: Literal["vector", "hybrid", "hybrid_rerank"] = "hybrid_rerank"
     reranker_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"

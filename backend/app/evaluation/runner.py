@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.evaluation.dataset import EvalQuestion
 from app.evaluation.scoring import contains_accepted_answer
-from app.qa.baseline import AnswerGenerationError, Pipeline
+from app.qa.baseline import AnswerGenerationError, Pipeline, answer_question
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ async def evaluate_question(
 ) -> QuestionResult:
     started = time.perf_counter()
     try:
-        response, sources = await pipeline.answer(session, question.question, top_k)
+        final = await answer_question(pipeline, session, question.question, top_k)
     except AnswerGenerationError as exc:
         return QuestionResult(
             id=question.id,
@@ -61,6 +61,7 @@ async def evaluate_question(
             seconds=time.perf_counter() - started,
         )
 
+    response, sources = final.response, final.sources
     cited = [sources[citation.source - 1] for citation in response.citations]
     if question.answerable:
         correct = contains_accepted_answer(question, response.answer)

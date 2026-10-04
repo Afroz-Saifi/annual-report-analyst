@@ -13,8 +13,9 @@ search again. Both loops share one limit on rewrites.
 """
 
 import operator
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Annotated, Any, Literal, TypedDict
+from typing import Annotated, Any, Literal, TypedDict, cast
 
 from langgraph.graph import START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -23,11 +24,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.rewrite import QueryRewriter
 from app.agent.verify import unsupported_figures
-from app.qa.baseline import NO_REPORTS_ANSWER, AnswerGenerator, DraftAnswer, build_response
+from app.qa.baseline import (
+    NO_REPORTS_ANSWER,
+    AnswerGenerationError,
+    AnswerGenerator,
+    DraftAnswer,
+    FinalAnswer,
+    build_response,
+)
 from app.retrieval.fusion import reciprocal_rank_fusion
 from app.retrieval.retriever import Retriever
 from app.retrieval.types import RetrievedChunk
-from app.schemas.ask import AgentStep, AskResponse
+from app.schemas.ask import AgentStep
 
 
 @dataclass(frozen=True)
@@ -127,10 +135,10 @@ class AgentPipeline:
     def __init__(self, agent: Agent) -> None:
         self._agent = agent
 
-    async def answer(
+    async def stream(
         self, session: AsyncSession, question: str, top_k: int
-    ) -> tuple[AskResponse, list[RetrievedChunk]]:
-        initial: AgentState = {
+    ) -> AsyncIterator[AgentStep | FinalAnswer]:
+        state: AgentState = {
             "question": question,
             "queries": [question],
             "tried": [],
@@ -140,11 +148,24 @@ class AgentPipeline:
             "unverified": [],
             "steps": [],
         }
-        state = await self._agent.ainvoke(initial, context=AgentContext(session, top_k))
+        # "updates" carries what each node just did, so its steps can be sent
+        # on at once; "values" carries the whole state, which the answer needs.
+        async for mode, chunk in self._agent.astream(
+            state, context=AgentContext(session, top_k), stream_mode=["updates", "values"]
+        ):
+            if mode == "values":
+                state = cast(AgentState, chunk)
+                continue
+            for update in cast(dict[str, dict[str, Any]], chunk).values():
+                for step in update.get("steps", []):
+                    yield step
+
         draft, sources = state["draft"], state["sources"]
+        if draft is None:
+            raise AnswerGenerationError("The agent ended without an answer.")
         response = build_response(draft, sources)
         response.steps = state["steps"]
         if draft.found:
             response.verified = not state["unverified"]
             response.unverified_figures = state["unverified"]
-        return response, sources
+        yield FinalAnswer(response, sources)

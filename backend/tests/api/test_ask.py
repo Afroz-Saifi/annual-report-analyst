@@ -1,14 +1,16 @@
+import json
 from collections.abc import AsyncIterator
 
 import pytest
 from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.graph import AgentPipeline, build_agent
 from app.api.deps import get_pipeline, get_session
 from app.main import app
 from app.qa.baseline import BaselinePipeline, DraftAnswer
 from app.retrieval.retriever import VectorRetriever
-from tests.fakes import AxisEmbeddings, FakeAnswerGenerator
+from tests.fakes import AxisEmbeddings, FakeAnswerGenerator, FakeQueryRewriter
 from tests.retrieval.seed import seed_report
 
 pytestmark = pytest.mark.anyio
@@ -47,6 +49,7 @@ async def test_ask_answers_with_citations_from_the_retrieved_pages(
     assert body["citations"] == [
         {
             "source": 1,
+            "report_id": 1,
             "company": "Sample Ltd",
             "fiscal_year": 2025,
             "page_number": 2,
@@ -90,3 +93,53 @@ async def test_ask_rejects_a_too_short_question(client: AsyncClient) -> None:
     response = await client.post("/ask", json={"question": "a"})
 
     assert response.status_code == 422
+
+
+def use_agent(generator: FakeAnswerGenerator, rewriter: FakeQueryRewriter) -> None:
+    retriever = VectorRetriever(AxisEmbeddings(query_axis=1))
+    agent = AgentPipeline(build_agent(retriever, generator, rewriter, max_rewrites=1))
+    app.dependency_overrides[get_pipeline] = lambda: agent
+
+
+def parse_events(body: str) -> list[tuple[str, dict[str, object]]]:
+    events = []
+    for block in body.strip().split("\n\n"):
+        fields = dict(line.split(": ", 1) for line in block.splitlines() if ": " in line)
+        events.append((fields["event"], json.loads(fields["data"])))
+    return events
+
+
+async def test_ask_stream_sends_each_step_and_then_the_answer(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_report(db_session)
+    draft = DraftAnswer(answer="Attrition fell [1].", citations=[1], found=True)
+    use_agent(FakeAnswerGenerator(draft), FakeQueryRewriter())
+
+    response = await client.post("/ask/stream", json={"question": "What was attrition?"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = parse_events(response.text)
+    assert [name for name, _ in events] == ["step", "step", "step", "answer"]
+    assert [data["step"] for name, data in events if name == "step"] == [
+        "retrieve",
+        "answer",
+        "verify",
+    ]
+    answer = events[-1][1]
+    assert (answer["answer"], answer["verified"]) == ("Attrition fell [1].", True)
+
+
+async def test_ask_stream_reports_a_model_failure_as_an_error_event(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_report(db_session)
+    use_agent(FakeAnswerGenerator(draft=None), FakeQueryRewriter())
+
+    response = await client.post("/ask/stream", json={"question": "What was attrition?"})
+
+    assert response.status_code == 200
+    events = parse_events(response.text)
+    assert events[-1] == ("error", {"detail": "The language model request failed."})
+    assert [name for name, _ in events[:-1]] == ["step"]

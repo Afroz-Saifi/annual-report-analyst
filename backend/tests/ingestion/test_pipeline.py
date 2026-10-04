@@ -34,6 +34,7 @@ async def test_ingest_stores_report_and_chunks(db_session: AsyncSession, sample_
     assert (result.status, result.pages, result.table_chunks) == ("ingested", 2, 1)
     report = (await db_session.scalars(select(Report))).one()
     assert (report.company, report.page_count) == ("Sample Ltd", 2)
+    assert report.file_name == "sample-report.pdf"
     chunks = (await db_session.scalars(select(Chunk).order_by(Chunk.chunk_index))).all()
     assert [chunk.kind for chunk in chunks] == ["text", "text", "table"]
     assert [chunk.page_number for chunk in chunks] == [1, 2, 2]
@@ -49,6 +50,21 @@ async def test_ingesting_the_same_file_twice_is_a_no_op(
 
     assert result.status == "unchanged"
     assert await db_session.scalar(select(func.count()).select_from(Report)) == 1
+
+
+async def test_re_running_records_a_file_name_missing_from_an_older_ingest(
+    db_session: AsyncSession, sample_pdf: Path
+) -> None:
+    await ingest_report(db_session, FakeEmbeddings(), ENTRY, sample_pdf)
+    report = (await db_session.scalars(select(Report))).one()
+    report.file_name = None
+    await db_session.commit()
+
+    result = await ingest_report(db_session, FakeEmbeddings(), ENTRY, sample_pdf)
+
+    assert result.status == "unchanged"
+    await db_session.refresh(report)
+    assert report.file_name == "sample-report.pdf"
 
 
 @pytest.fixture

@@ -4,6 +4,8 @@ One retrieval, one model call, no retries. The evaluation compares the agent
 against this.
 """
 
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from typing import Protocol
 
 from google.genai.errors import APIError
@@ -15,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.retrieval.retriever import Retriever
 from app.retrieval.types import RetrievedChunk
-from app.schemas.ask import AskResponse, Citation
+from app.schemas.ask import AgentStep, AskResponse, Citation
 
 EXCERPT_CHARS = 300
 NO_REPORTS_ANSWER = "No reports have been ingested yet."
@@ -82,6 +84,7 @@ def build_response(draft: DraftAnswer, sources: list[RetrievedChunk]) -> AskResp
         citations=[
             Citation(
                 source=number,
+                report_id=sources[number - 1].report_id,
                 company=sources[number - 1].company,
                 fiscal_year=sources[number - 1].fiscal_year,
                 page_number=sources[number - 1].page_number,
@@ -94,12 +97,27 @@ def build_response(draft: DraftAnswer, sources: list[RetrievedChunk]) -> AskResp
     )
 
 
+@dataclass(frozen=True)
+class FinalAnswer:
+    response: AskResponse
+    sources: list[RetrievedChunk]
+
+
 class Pipeline(Protocol):
-    async def answer(
+    def stream(
         self, session: AsyncSession, question: str, top_k: int
-    ) -> tuple[AskResponse, list[RetrievedChunk]]:
-        """Answers the question and also returns every source the model was shown."""
+    ) -> AsyncIterator[AgentStep | FinalAnswer]:
+        """Yields each step as it happens, then the answer with every source shown to the model."""
         ...
+
+
+async def answer_question(
+    pipeline: Pipeline, session: AsyncSession, question: str, top_k: int
+) -> FinalAnswer:
+    async for event in pipeline.stream(session, question, top_k):
+        if isinstance(event, FinalAnswer):
+            return event
+    raise AnswerGenerationError("The pipeline ended without an answer.")
 
 
 class BaselinePipeline:
@@ -107,11 +125,12 @@ class BaselinePipeline:
         self._retriever = retriever
         self._generator = generator
 
-    async def answer(
+    async def stream(
         self, session: AsyncSession, question: str, top_k: int
-    ) -> tuple[AskResponse, list[RetrievedChunk]]:
+    ) -> AsyncIterator[AgentStep | FinalAnswer]:
         sources = await self._retriever.retrieve(session, question, limit=top_k)
         if not sources:
-            return AskResponse(answer=NO_REPORTS_ANSWER, citations=[]), []
+            yield FinalAnswer(AskResponse(answer=NO_REPORTS_ANSWER, citations=[]), [])
+            return
         draft = await self._generator.generate(question, sources)
-        return build_response(draft, sources), sources
+        yield FinalAnswer(build_response(draft, sources), sources)

@@ -8,6 +8,7 @@ class AskRequest(BaseModel):
 
 class Citation(BaseModel):
     source: int = Field(description="The number used for this source in the answer, as in [2].")
+    report_id: int
     company: str
     fiscal_year: int
     page_number: int

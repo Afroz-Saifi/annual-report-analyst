@@ -28,7 +28,10 @@ It answers from the documents only. It does not give investment advice.
    again. It then checks every figure in the answer against the cited pages,
    without a model call, and searches again if one is missing.
 4. **The API** (FastAPI) streams the agent's progress and the final answer to
-   the web app.
+   the web app as server-sent events.
+5. **The web app** (React) shows each step as it happens, the answer with its
+   sources, and the cited page of the PDF with the answer's figures
+   highlighted.
 
 ## Tech stack
 
@@ -56,7 +59,7 @@ It answers from the documents only. It does not give investment advice.
 - [x] Evaluation set and baseline accuracy score
 - [x] Hybrid search and reranking
 - [x] LangGraph agent with query rewriting and number verification
-- [ ] Web app: chat, live progress and cited-page viewer
+- [x] Web app: chat, live progress and cited-page viewer
 - [ ] 10–15 companies, model comparison, live demo
 
 ## Run locally
@@ -106,6 +109,27 @@ Each report is parsed page by page, split into text and table chunks,
 embedded locally and stored with its page number. Running the command again
 skips reports whose file has not changed.
 
+## Run the web app
+
+With the database and API running as above, start the frontend in a second
+terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open <http://localhost:5173>. The dev server forwards `/api` requests to the
+API on port 8000. The page viewer reads the PDFs from `data/raw/`, so a report
+must be downloaded there for its pages to show.
+
+Frontend checks, from `frontend/`:
+
+```bash
+npm run typecheck && npm run lint && npm test && npm run build
+```
+
 ## Ask a question
 
 Put a Gemini API key in `backend/.env` as `GOOGLE_API_KEY`, start the API and
@@ -117,7 +141,9 @@ curl -X POST localhost:8000/ask \
   -d '{"question": "What dividend per share was recommended?"}'
 ```
 
-The response holds:
+`POST /ask/stream` takes the same body and sends a `step` event as each agent
+step finishes, then one `answer` event. `POST /ask` waits and returns the
+answer in one piece. The answer holds:
 
 - `answer`, with `[n]` markers after each claim
 - `citations`: the report, page and excerpt behind each marker

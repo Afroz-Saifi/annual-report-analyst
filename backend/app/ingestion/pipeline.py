@@ -36,6 +36,9 @@ async def ingest_report(
     )
     if existing is not None:
         if existing.file_sha256 == file_sha256:
+            if existing.file_name != entry.file:
+                existing.file_name = entry.file
+                await session.commit()
             return IngestResult(
                 status="unchanged", pages=existing.page_count, text_chunks=0, table_chunks=0
             )
@@ -54,6 +57,7 @@ async def ingest_report(
         fiscal_year=entry.fiscal_year,
         source_url=entry.source_url,
         file_sha256=file_sha256,
+        file_name=entry.file,
         page_count=len(pages),
         chunks=[
             Chunk(

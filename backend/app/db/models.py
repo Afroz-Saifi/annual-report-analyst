@@ -33,6 +33,7 @@ class Report(Base):
     fiscal_year: Mapped[int]
     source_url: Mapped[str] = mapped_column(Text)
     file_sha256: Mapped[str] = mapped_column(String(64))
+    file_name: Mapped[str | None] = mapped_column(String(255))
     page_count: Mapped[int]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

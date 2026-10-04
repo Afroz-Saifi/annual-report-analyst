@@ -2,9 +2,10 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.graph import AgentPipeline, build_agent
-from app.qa.baseline import DraftAnswer
+from app.qa.baseline import DraftAnswer, answer_question
 from app.retrieval.retriever import HybridRetriever
 from app.retrieval.types import RetrievedChunk
+from app.schemas.ask import AskResponse
 from tests.fakes import AxisEmbeddings, FakeAnswerGenerator, FakeQueryRewriter
 from tests.retrieval.seed import seed_report
 
@@ -32,6 +33,13 @@ def pipeline(
     return AgentPipeline(build_agent(retriever, generator, rewriter, max_rewrites))
 
 
+async def ask(
+    agent: AgentPipeline, session: AsyncSession, question: str
+) -> tuple[AskResponse, list[RetrievedChunk]]:
+    final = await answer_question(agent, session, question, top_k=1)
+    return final.response, final.sources
+
+
 async def test_an_answer_found_on_the_first_search_needs_no_rewrite(
     db_session: AsyncSession,
 ) -> None:
@@ -41,7 +49,7 @@ async def test_an_answer_found_on_the_first_search_needs_no_rewrite(
     )
     rewriter = FakeQueryRewriter()
 
-    response, sources = await pipeline(generator, rewriter).answer(db_session, "revenue", top_k=1)
+    response, sources = await ask(pipeline(generator, rewriter), db_session, "revenue")
 
     assert response.answer == "Revenue grew [1]."
     assert [step.step for step in response.steps] == ["retrieve", "answer", "verify"]
@@ -58,8 +66,8 @@ async def test_a_missed_answer_is_found_after_rewriting_the_query(
     generator = FakeAnswerGenerator(answer_when_dividend_page_is_shown)
     rewriter = FakeQueryRewriter(["final dividend recommended"])
 
-    response, sources = await pipeline(generator, rewriter).answer(
-        db_session, "payout to shareholders", top_k=1
+    response, sources = await ask(
+        pipeline(generator, rewriter), db_session, "payout to shareholders"
     )
 
     assert [step.step for step in response.steps] == [
@@ -80,8 +88,8 @@ async def test_the_agent_stops_rewriting_at_the_limit(db_session: AsyncSession) 
     generator = FakeAnswerGenerator(NOT_FOUND)
     rewriter = FakeQueryRewriter(["first retry"], ["second retry"], ["never used"])
 
-    response, _ = await pipeline(generator, rewriter, max_rewrites=2).answer(
-        db_session, "football world cup", top_k=1
+    response, _ = await ask(
+        pipeline(generator, rewriter, max_rewrites=2), db_session, "football world cup"
     )
 
     assert response.answer == "The sources do not say."
@@ -102,8 +110,8 @@ async def test_a_figure_missing_from_the_cited_source_is_flagged(
         DraftAnswer(answer="Revenue grew 9.6% [1].", citations=[1], found=True)
     )
 
-    response, _ = await pipeline(generator, FakeQueryRewriter(), max_rewrites=0).answer(
-        db_session, "revenue", top_k=1
+    response, _ = await ask(
+        pipeline(generator, FakeQueryRewriter(), max_rewrites=0), db_session, "revenue"
     )
 
     assert response.verified is False
@@ -123,8 +131,8 @@ async def test_an_unverified_figure_sends_the_agent_back_to_search(
 
     rewriter = FakeQueryRewriter(["final dividend recommended"])
 
-    response, _ = await pipeline(FakeAnswerGenerator(guess_then_read), rewriter).answer(
-        db_session, "payout", top_k=1
+    response, _ = await ask(
+        pipeline(FakeAnswerGenerator(guess_then_read), rewriter), db_session, "payout"
     )
 
     assert [step.step for step in response.steps] == [
@@ -146,7 +154,7 @@ async def test_an_empty_database_answers_without_calling_the_model(
     generator = FakeAnswerGenerator(NOT_FOUND)
     rewriter = FakeQueryRewriter()
 
-    response, sources = await pipeline(generator, rewriter).answer(db_session, "revenue", top_k=1)
+    response, sources = await ask(pipeline(generator, rewriter), db_session, "revenue")
 
     assert response.answer == "No reports have been ingested yet."
     assert (sources, generator.calls, rewriter.calls) == ([], [], [])
