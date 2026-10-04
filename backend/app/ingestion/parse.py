@@ -30,7 +30,9 @@ def parse_pdf(path: Path) -> list[ParsedPage]:
 
 
 def is_usable_table(table: Table) -> bool:
-    return len(table) >= 2 and max(len(row) for row in table) >= 2
+    has_shape = len(table) >= 2 and max(len(row) for row in table) >= 2
+    # Decorative grids are detected as tables with every cell empty.
+    return has_shape and any(cell and cell.strip() for row in table for cell in row)
 
 
 def table_to_markdown(table: Table) -> str:

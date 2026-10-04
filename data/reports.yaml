@@ -7,4 +7,9 @@
 #   fiscal_year: 2025          # the year the financial year ends
 #   source_url: https://example.com/annual-report-2025.pdf
 #   file: example-ar-2025.pdf  # file name inside data/raw/
-reports: []
+reports:
+  - company: Infosys
+    ticker: INFY
+    fiscal_year: 2026
+    source_url: https://www.infosys.com/investors/reports-filings/annual-report/annual/documents/infosys-ar-26.pdf
+    file: infosys-ar-26.pdf

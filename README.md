@@ -48,7 +48,7 @@ It answers from the documents only. It does not give investment advice.
 
 - [x] Repository skeleton
 - [x] Backend runs: FastAPI health endpoint, PostgreSQL with pgvector in Docker
-- [ ] Ingest one report end to end (pipeline built; first real report pending)
+- [x] Ingest one report end to end
 - [ ] Plain question answering with page citations
 - [ ] Evaluation set and baseline accuracy score
 - [ ] Hybrid search and reranking

@@ -23,6 +23,10 @@ def test_single_row_or_single_column_tables_are_not_usable() -> None:
     assert is_usable_table([["a", "b"], ["c", "d"]])
 
 
+def test_tables_with_only_empty_cells_are_not_usable() -> None:
+    assert not is_usable_table([[None, ""], [" ", None]])
+
+
 def test_parse_pdf_keeps_page_numbers_text_and_tables(sample_pdf: Path) -> None:
     pages = parse_pdf(sample_pdf)
 
