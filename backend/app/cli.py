@@ -1,5 +1,6 @@
 import asyncio
 import json
+import statistics
 import time
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -69,9 +70,13 @@ async def _ingest(manifest_path: Path, raw_dir: Path, force: bool) -> None:
 
 @cli.command(name="eval")
 def evaluate(
-    dataset: Annotated[Path, typer.Option(help="Questions with their accepted answers.")] = Path(
-        "evals/questions.yaml"
-    ),
+    dataset: Annotated[
+        list[Path] | None,
+        typer.Option(help="Questions with their accepted answers. Repeat to combine sets."),
+    ] = None,
+    model: Annotated[
+        str | None, typer.Option(help="Gemini model to use. Defaults to the configured model.")
+    ] = None,
     top_k: Annotated[int, typer.Option(help="Sources shown to the model per question.")] = 8,
     retrieval: Annotated[
         RetrievalMode | None,
@@ -94,15 +99,20 @@ def evaluate(
     if settings.google_api_key is None or not settings.google_api_key.get_secret_value():
         typer.echo("GOOGLE_API_KEY is not set in backend/.env")
         raise typer.Exit(code=1)
+    api_key = settings.google_api_key
+    if model:
+        settings = settings.model_copy(update={"llm_model": model})
+    datasets = dataset or [Path("evals/questions.yaml")]
     mode = retrieval or settings.retrieval_mode
     pipeline_name = pipeline or settings.pipeline
     expand = settings.expand_pages if expand_pages is None else expand_pages
-    built = build_pipeline(settings, settings.google_api_key, pipeline_name, mode, expand)
-    results = asyncio.run(_evaluate(dataset, built, top_k))
+    built = build_pipeline(settings, api_key, pipeline_name, mode, expand)
+    results = asyncio.run(_evaluate(datasets, built, top_k))
     summaries = summarise(results)
 
     typer.echo(_format_results(results))
     typer.echo(_format_summary(summaries))
+    typer.echo(_format_costs(results))
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
@@ -110,6 +120,7 @@ def evaluate(
         json.dumps(
             {
                 "llm_model": settings.llm_model,
+                "datasets": [str(path) for path in datasets],
                 "embedding_model": settings.embedding_model,
                 "pipeline": pipeline_name,
                 "retrieval_mode": mode,
@@ -125,8 +136,10 @@ def evaluate(
     typer.echo(f"Full results saved to {output_path}")
 
 
-async def _evaluate(dataset_path: Path, pipeline: Pipeline, top_k: int) -> list[QuestionResult]:
-    questions = load_dataset(dataset_path).questions
+async def _evaluate(
+    dataset_paths: list[Path], pipeline: Pipeline, top_k: int
+) -> list[QuestionResult]:
+    questions = [q for path in dataset_paths for q in load_dataset(path).questions]
     results = []
     try:
         async with SessionLocal() as session:
@@ -168,6 +181,20 @@ def _format_summary(summaries: list[Summary]) -> str:
             f"{share(summary.supported, summary.answerable)}"
         )
     return "\n".join(lines)
+
+
+def _format_costs(results: list[QuestionResult]) -> str:
+    seconds = sorted(result.seconds for result in results)
+    input_tokens = sum(result.input_tokens for result in results)
+    output_tokens = sum(result.output_tokens for result in results)
+    errors = sum(result.error is not None for result in results)
+    return (
+        f"\nTime per question: median {statistics.median(seconds):.1f}s, "
+        f"mean {statistics.mean(seconds):.1f}s, slowest {seconds[-1]:.1f}s\n"
+        f"Tokens: {input_tokens:,} input and {output_tokens:,} output "
+        f"over {len(results)} questions\n"
+        f"Model errors: {errors}"
+    )
 
 
 if __name__ == "__main__":

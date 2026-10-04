@@ -68,7 +68,8 @@ It answers from the documents only. It does not give investment advice.
 - [x] Web app: chat, live progress and cited-page viewer
 - [x] A second year's report, with search split by company and year
 - [x] A second company (TCS) and cross-company questions
-- [ ] Model comparison, more companies, live demo
+- [x] Model comparison
+- [ ] More companies, live demo
 
 ## Run locally
 
@@ -326,6 +327,40 @@ for, both on the Infosys side:
 Known gaps in the TCS text: 64 chunks, including the CSR annexure, come from
 pages whose font pdfplumber cannot decode at all, and the attrition figure sits
 inside a graphic whose text is scrambled. No question relies on them.
+
+### Model comparison (5 October 2026)
+
+The same 55 questions (`questions.yaml`, `comparison.yaml` and
+`cross_company.yaml`) run once on each model, with the agent, hybrid retrieval
+with the reranker, and whole-page sources throughout. Choosing a model is a
+design decision, so the held-out sets were left out. Run one model with
+`uv run python -m app.cli eval --model <name> --dataset <file> --dataset <file>`.
+
+| Model                    | Correct     | Median time | Input tokens | Output tokens | Cost for 55 questions |
+| ------------------------ | ----------- | ----------- | ------------ | ------------- | --------------------- |
+| `gemini-3.5-flash-lite`  | 51/55 (93%) | 3.2 s       | 574,920      | 5,477         | $0.19                 |
+| `gemini-3.5-flash`       | 50/55 (91%) | 6.5 s       | 577,477      | 60,016        | $1.41                 |
+| `gemini-3.8-flash`       | 52/55 (95%) | 4.7 s       | 576,528      | 38,885        | $0.58 ($1.16 from 2027) |
+| `gemini-3.1-pro-preview` | 48/55 (87%) | 7.6 s       | 603,454      | 59,361        | $1.92                 |
+
+Cost uses Google's paid-tier list prices per million tokens as of 5 October
+2026: Flash-Lite $0.30 in and $2.50 out; 3.5 Flash $1.50 and $9.00; 3.8 Flash
+$0.75 and $3.75 until 31 December 2026, then $1.50 and $7.50; 3.1 Pro Preview
+$2.00 and $12.00. Output includes the models' reasoning tokens, which are
+billed as output. Embeddings and the reranker run locally and cost nothing.
+
+- The three Flash models are within run-to-run noise of each other: the same
+  model and questions have scored one question apart on different runs. The
+  ranking among them should not be read from one run each.
+- Flash-Lite spends almost no output tokens because it does not reason before
+  answering, which makes it about 7 times cheaper than 3.5 Flash and the
+  fastest, at no measured loss on these questions.
+- Pro scored lowest. On year-on-year questions it declined more often, saying
+  one year's figure was not stated where the other models read it from pages
+  whose text is partly scrambled, such as infographics.
+- Every model got all 35 single-fact questions right. The differences are all
+  in comparisons and calculations, which is also where retrieval misses
+  concentrate.
 
 ### Comparison questions (4 October 2026)
 
