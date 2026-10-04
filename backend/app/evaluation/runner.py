@@ -1,12 +1,12 @@
 import time
 from dataclasses import dataclass
 
-from langchain_core.embeddings import Embeddings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.evaluation.dataset import EvalQuestion
 from app.evaluation.scoring import contains_accepted_answer
 from app.qa.baseline import AnswerGenerationError, AnswerGenerator, retrieve_and_answer
+from app.retrieval.retriever import Retriever
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ class Summary:
 
 async def evaluate_question(
     session: AsyncSession,
-    embeddings: Embeddings,
+    retriever: Retriever,
     generator: AnswerGenerator,
     question: EvalQuestion,
     top_k: int,
@@ -45,7 +45,7 @@ async def evaluate_question(
     started = time.perf_counter()
     try:
         response, sources = await retrieve_and_answer(
-            session, embeddings, generator, question.question, top_k
+            session, retriever, generator, question.question, top_k
         )
     except AnswerGenerationError as exc:
         return QuestionResult(

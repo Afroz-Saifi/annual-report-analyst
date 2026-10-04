@@ -4,11 +4,12 @@ import pytest
 from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_answer_generator, get_embeddings, get_session
+from app.api.deps import get_answer_generator, get_retriever, get_session
 from app.main import app
 from app.qa.baseline import DraftAnswer
+from app.retrieval.retriever import VectorRetriever
 from tests.fakes import AxisEmbeddings, FakeAnswerGenerator
-from tests.retrieval.test_vector import seed_report
+from tests.retrieval.seed import seed_report
 
 pytestmark = pytest.mark.anyio
 
@@ -19,7 +20,7 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
         yield db_session
 
     app.dependency_overrides[get_session] = session_override
-    app.dependency_overrides[get_embeddings] = lambda: AxisEmbeddings(query_axis=1)
+    app.dependency_overrides[get_retriever] = lambda: VectorRetriever(AxisEmbeddings(query_axis=1))
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
     app.dependency_overrides.clear()
@@ -49,7 +50,7 @@ async def test_ask_answers_with_citations_from_the_retrieved_pages(
             "page_number": 2,
             "kind": "table",
             "source_url": "https://example.com/sample.pdf",
-            "excerpt": "about attrition",
+            "excerpt": "Voluntary attrition for permanent employees fell.",
         }
     ]
     assert len(generator.seen_sources) == 2

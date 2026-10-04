@@ -4,8 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.evaluation.dataset import EvalQuestion
 from app.evaluation.runner import QuestionResult, evaluate_question, summarise
 from app.qa.baseline import DraftAnswer
+from app.retrieval.retriever import VectorRetriever
 from tests.fakes import AxisEmbeddings, FakeAnswerGenerator
-from tests.retrieval.test_vector import seed_report
+from tests.retrieval.seed import seed_report
 
 pytestmark = pytest.mark.anyio
 
@@ -14,7 +15,7 @@ ATTRITION = EvalQuestion(
     category="people",
     question="What was attrition?",
     type="text",
-    accepted=["about attrition"],
+    accepted=["voluntary attrition"],
 )
 WORLD_CUP = EvalQuestion(
     id="world-cup", category="unanswerable", question="Who won?", answerable=False
@@ -26,14 +27,18 @@ async def run(
 ) -> QuestionResult:
     await seed_report(session)
     return await evaluate_question(
-        session, AxisEmbeddings(query_axis=1), FakeAnswerGenerator(draft), question, top_k=2
+        session,
+        VectorRetriever(AxisEmbeddings(query_axis=1)),
+        FakeAnswerGenerator(draft),
+        question,
+        top_k=2,
     )
 
 
 async def test_a_right_answer_citing_the_right_source_is_correct_and_supported(
     db_session: AsyncSession,
 ) -> None:
-    draft = DraftAnswer(answer="The page is about attrition [1].", citations=[1])
+    draft = DraftAnswer(answer="Voluntary attrition fell [1].", citations=[1])
 
     result = await run(db_session, ATTRITION, draft)
 
@@ -44,7 +49,7 @@ async def test_a_right_answer_citing_the_right_source_is_correct_and_supported(
 async def test_a_right_answer_citing_the_wrong_source_is_not_supported(
     db_session: AsyncSession,
 ) -> None:
-    draft = DraftAnswer(answer="The page is about attrition [2].", citations=[2])
+    draft = DraftAnswer(answer="Voluntary attrition fell [2].", citations=[2])
 
     result = await run(db_session, ATTRITION, draft)
 

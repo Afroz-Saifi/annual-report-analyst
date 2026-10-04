@@ -1,5 +1,5 @@
 from app.qa.baseline import EXCERPT_CHARS, DraftAnswer, build_response, format_sources
-from app.retrieval.vector import RetrievedChunk
+from app.retrieval.types import RetrievedChunk
 
 
 def source(page: int, content: str, kind: str = "text") -> RetrievedChunk:
@@ -11,7 +11,7 @@ def source(page: int, content: str, kind: str = "text") -> RetrievedChunk:
         page_number=page,
         kind=kind,
         content=content,
-        distance=0.1,
+        score=0.9,
     )
 
 

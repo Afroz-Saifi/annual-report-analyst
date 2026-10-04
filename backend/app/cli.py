@@ -16,6 +16,7 @@ from app.ingestion.embed import LocalEmbeddings
 from app.ingestion.manifest import load_manifest
 from app.ingestion.pipeline import ingest_report
 from app.qa.baseline import GeminiAnswerGenerator
+from app.retrieval.retriever import RetrievalMode, build_retriever
 
 cli = typer.Typer(no_args_is_help=True)
 
@@ -68,6 +69,10 @@ def evaluate(
         "evals/questions.yaml"
     ),
     top_k: Annotated[int, typer.Option(help="Sources shown to the model per question.")] = 8,
+    retrieval: Annotated[
+        RetrievalMode | None,
+        typer.Option(help="vector, hybrid or hybrid_rerank. Defaults to the configured mode."),
+    ] = None,
     output_dir: Annotated[Path, typer.Option(help="Where the full results are saved.")] = Path(
         "evals/results"
     ),
@@ -78,7 +83,8 @@ def evaluate(
         typer.echo("GOOGLE_API_KEY is not set in backend/.env")
         raise typer.Exit(code=1)
     generator = GeminiAnswerGenerator(settings.llm_model, settings.google_api_key)
-    results = asyncio.run(_evaluate(dataset, generator, top_k))
+    mode = retrieval or settings.retrieval_mode
+    results = asyncio.run(_evaluate(dataset, generator, mode, top_k))
     summaries = summarise(results)
 
     typer.echo(_format_results(results))
@@ -91,6 +97,7 @@ def evaluate(
             {
                 "llm_model": settings.llm_model,
                 "embedding_model": settings.embedding_model,
+                "retrieval_mode": mode,
                 "top_k": top_k,
                 "summary": [asdict(summary) for summary in summaries],
                 "results": [asdict(result) for result in results],
@@ -103,16 +110,19 @@ def evaluate(
 
 
 async def _evaluate(
-    dataset_path: Path, generator: GeminiAnswerGenerator, top_k: int
+    dataset_path: Path, generator: GeminiAnswerGenerator, mode: RetrievalMode, top_k: int
 ) -> list[QuestionResult]:
     questions = load_dataset(dataset_path).questions
-    embeddings = LocalEmbeddings(get_settings().embedding_model)
+    settings = get_settings()
+    retriever = build_retriever(
+        mode, LocalEmbeddings(settings.embedding_model), settings.reranker_model
+    )
     results = []
     try:
         async with SessionLocal() as session:
             for question in questions:
                 results.append(
-                    await evaluate_question(session, embeddings, generator, question, top_k)
+                    await evaluate_question(session, retriever, generator, question, top_k)
                 )
     finally:
         await engine.dispose()

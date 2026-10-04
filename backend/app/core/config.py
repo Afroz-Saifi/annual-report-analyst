@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,6 +12,8 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = "postgresql+asyncpg://analyst:analyst@localhost:5440/analyst"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
+    retrieval_mode: Literal["vector", "hybrid", "hybrid_rerank"] = "hybrid_rerank"
+    reranker_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
     llm_model: str = "gemini-3.5-flash"
     google_api_key: SecretStr | None = None
 

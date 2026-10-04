@@ -1,20 +1,20 @@
 """Plain retrieve-then-answer question answering.
 
-This is the baseline the evaluation measures before hybrid search and the
-agent are added: one vector search, one model call, no retries.
+One retrieval, one model call, no retries. This is what the evaluation
+measures before the agent is added.
 """
 
 from typing import Protocol
 
 from google.genai.errors import APIError
-from langchain_core.embeddings import Embeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.retrieval.vector import RetrievedChunk, search_chunks
+from app.retrieval.retriever import Retriever
+from app.retrieval.types import RetrievedChunk
 from app.schemas.ask import AskResponse, Citation
 
 EXCERPT_CHARS = 300
@@ -93,13 +93,13 @@ def build_response(draft: DraftAnswer, sources: list[RetrievedChunk]) -> AskResp
 
 async def retrieve_and_answer(
     session: AsyncSession,
-    embeddings: Embeddings,
+    retriever: Retriever,
     generator: AnswerGenerator,
     question: str,
     top_k: int,
 ) -> tuple[AskResponse, list[RetrievedChunk]]:
     """Answers the question and also returns every source the model was shown."""
-    sources = await search_chunks(session, embeddings, question, limit=top_k)
+    sources = await retriever.retrieve(session, question, limit=top_k)
     if not sources:
         return AskResponse(answer="No reports have been ingested yet.", citations=[]), []
     draft = await generator.generate(question, sources)
@@ -108,10 +108,10 @@ async def retrieve_and_answer(
 
 async def answer_question(
     session: AsyncSession,
-    embeddings: Embeddings,
+    retriever: Retriever,
     generator: AnswerGenerator,
     question: str,
     top_k: int,
 ) -> AskResponse:
-    response, _ = await retrieve_and_answer(session, embeddings, generator, question, top_k)
+    response, _ = await retrieve_and_answer(session, retriever, generator, question, top_k)
     return response

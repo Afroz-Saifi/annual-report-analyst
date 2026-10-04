@@ -3,13 +3,13 @@ from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-from langchain_core.embeddings import Embeddings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.ingestion.embed import LocalEmbeddings
 from app.qa.baseline import AnswerGenerator, GeminiAnswerGenerator
+from app.retrieval.retriever import Retriever, build_retriever
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
@@ -18,8 +18,11 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 
 @lru_cache
-def get_embeddings() -> Embeddings:
-    return LocalEmbeddings(get_settings().embedding_model)
+def get_retriever() -> Retriever:
+    settings = get_settings()
+    return build_retriever(
+        settings.retrieval_mode, LocalEmbeddings(settings.embedding_model), settings.reranker_model
+    )
 
 
 @lru_cache
@@ -33,5 +36,5 @@ def get_answer_generator() -> AnswerGenerator:
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-EmbeddingsDep = Annotated[Embeddings, Depends(get_embeddings)]
+RetrieverDep = Annotated[Retriever, Depends(get_retriever)]
 AnswerGeneratorDep = Annotated[AnswerGenerator, Depends(get_answer_generator)]

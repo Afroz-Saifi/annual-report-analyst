@@ -2,7 +2,7 @@ from langchain_core.embeddings import Embeddings
 
 from app.db.models import EMBEDDING_DIM
 from app.qa.baseline import AnswerGenerationError, DraftAnswer
-from app.retrieval.vector import RetrievedChunk
+from app.retrieval.types import RetrievedChunk
 
 
 def axis_vector(axis: int) -> list[float]:
@@ -32,3 +32,13 @@ class FakeAnswerGenerator:
         if self.draft is None:
             raise AnswerGenerationError("model unavailable")
         return self.draft
+
+
+class KeywordCountReranker:
+    """Scores a passage by how often it contains the given word."""
+
+    def __init__(self, word: str) -> None:
+        self.word = word
+
+    def score(self, question: str, passages: list[str]) -> list[float]:
+        return [float(passage.count(self.word)) for passage in passages]

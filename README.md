@@ -37,7 +37,8 @@ It answers from the documents only. It does not give investment advice.
 | Agent      | LangGraph, LangChain                               |
 | LLM        | Gemini (provider is a config setting)              |
 | Database   | PostgreSQL with pgvector, SQLAlchemy, Alembic      |
-| Retrieval  | Hybrid search, Reciprocal Rank Fusion, reranker    |
+| Retrieval  | Vector + keyword search, Reciprocal Rank Fusion    |
+| Reranker   | MiniLM cross-encoder, run locally with fastembed   |
 | PDF parsing| pdfplumber (text and tables)                       |
 | Embeddings | BGE small, run locally with fastembed              |
 | Evaluation | pytest and a hand-checked question set             |
@@ -49,9 +50,9 @@ It answers from the documents only. It does not give investment advice.
 - [x] Repository skeleton
 - [x] Backend runs: FastAPI health endpoint, PostgreSQL with pgvector in Docker
 - [x] Ingest one report end to end
-- [ ] Plain question answering with page citations
-- [ ] Evaluation set and baseline accuracy score
-- [ ] Hybrid search and reranking
+- [x] Plain question answering with page citations
+- [x] Evaluation set and baseline accuracy score
+- [x] Hybrid search and reranking
 - [ ] LangGraph agent with grading, rewriting and number verification
 - [ ] Web app: chat, live progress and cited-page viewer
 - [ ] 10–15 companies, model comparison, live demo
@@ -102,6 +103,81 @@ uv run python -m app.cli ingest
 Each report is parsed page by page, split into text and table chunks,
 embedded locally and stored with its page number. Running the command again
 skips reports whose file has not changed.
+
+## Ask a question
+
+Put a Gemini API key in `backend/.env` as `GOOGLE_API_KEY`, start the API and
+post a question:
+
+```bash
+curl -X POST localhost:8000/ask \
+  -H 'content-type: application/json' \
+  -d '{"question": "What dividend per share was recommended?"}'
+```
+
+The response holds the answer, with `[n]` markers, and a `citations` list
+giving the report, page and excerpt behind each marker. Each question is one
+retrieval and one model call.
+
+## Evaluation
+
+`backend/evals/questions.yaml` holds 35 questions about the Infosys 2025-26
+report. Each answer was read off a specific page, and three questions have no
+answer in the report. From `backend/`, run:
+
+```bash
+uv run python -m app.cli eval
+```
+
+Each question is scored three ways:
+
+- **Correct**: the answer contains the accepted figure or text. For a question
+  with no answer in the report, correct means the system said so and cited
+  nothing.
+- **Retrieved**: the accepted answer was somewhere in the sources shown to the
+  model.
+- **Supported**: the answer was correct and a source it cited contains the
+  accepted answer.
+
+### Baseline (4 October 2026)
+
+Plain vector search over 8 sources, one call to `gemini-3.5-flash`, embeddings
+from `BAAI/bge-small-en-v1.5`.
+
+| Category             | Correct      | Retrieved    | Supported    |
+| -------------------- | ------------ | ------------ | ------------ |
+| Financial statements | 10/12 (83%)  | 10/12 (83%)  | 10/12 (83%)  |
+| Highlights           | 11/12 (92%)  | 11/12 (92%)  | 11/12 (92%)  |
+| People               | 4/8 (50%)    | 4/8 (50%)    | 4/8 (50%)    |
+| Not in the report    | 3/3 (100%)   | n/a          | n/a          |
+| **Overall**          | **28/35 (80%)** | 25/32 (78%) | 25/32 (78%) |
+
+All seven misses were retrieval misses: the page holding the answer was not
+among the 8 sources, and the model said the sources did not contain it rather
+than guessing. Whenever the right page was retrieved, the answer was correct.
+Retrieval is therefore the first thing to improve.
+
+### Retrieval comparison (4 October 2026)
+
+Same questions, model and 8 sources per question; only the retrieval changes.
+Choose a mode with `--retrieval vector|hybrid|hybrid_rerank`.
+
+| Retrieval                                   | Correct         | Retrieved   | Time per question |
+| ------------------------------------------- | --------------- | ----------- | ----------------- |
+| Vector search (baseline)                    | 28/35 (80%)     | 25/32 (78%) | 3.3 s             |
+| Hybrid: vector + keyword, rank fusion       | 27/35 (77%)     | 24/32 (75%) | 3.6 s             |
+| **Hybrid + reranker (default)**             | **32/35 (91%)** | 29/32 (91%) | 5.6 s             |
+
+- Fusing keyword results in without a reranker made things slightly worse
+  (two financial-statement questions lost, one people question gained). The
+  cause has not been traced; keyword matches on words common to many pages
+  are the likely one.
+- Reranking the top 30 fused results recovered every people question
+  (4/8 to 8/8) and cost about two seconds per question on a laptop CPU.
+- The three remaining misses are candidate misses: the right chunk ranks
+  below 30 in both searches, so the reranker never sees it. They are dense
+  statement pages (balance sheet, cash flow, five-year summary) where a chunk
+  is mostly figures. Query rewriting in the agent is the next attempt at them.
 
 ## Repository layout
 
