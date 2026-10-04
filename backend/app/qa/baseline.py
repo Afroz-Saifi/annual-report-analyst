@@ -91,6 +91,21 @@ def build_response(draft: DraftAnswer, sources: list[RetrievedChunk]) -> AskResp
     )
 
 
+async def retrieve_and_answer(
+    session: AsyncSession,
+    embeddings: Embeddings,
+    generator: AnswerGenerator,
+    question: str,
+    top_k: int,
+) -> tuple[AskResponse, list[RetrievedChunk]]:
+    """Answers the question and also returns every source the model was shown."""
+    sources = await search_chunks(session, embeddings, question, limit=top_k)
+    if not sources:
+        return AskResponse(answer="No reports have been ingested yet.", citations=[]), []
+    draft = await generator.generate(question, sources)
+    return build_response(draft, sources), sources
+
+
 async def answer_question(
     session: AsyncSession,
     embeddings: Embeddings,
@@ -98,8 +113,5 @@ async def answer_question(
     question: str,
     top_k: int,
 ) -> AskResponse:
-    sources = await search_chunks(session, embeddings, question, limit=top_k)
-    if not sources:
-        return AskResponse(answer="No reports have been ingested yet.", citations=[])
-    draft = await generator.generate(question, sources)
-    return build_response(draft, sources)
+    response, _ = await retrieve_and_answer(session, embeddings, generator, question, top_k)
+    return response
