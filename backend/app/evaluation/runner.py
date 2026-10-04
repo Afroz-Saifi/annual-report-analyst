@@ -5,8 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.evaluation.dataset import EvalQuestion
 from app.evaluation.scoring import contains_accepted_answer
-from app.qa.baseline import AnswerGenerationError, AnswerGenerator, retrieve_and_answer
-from app.retrieval.retriever import Retriever
+from app.qa.baseline import AnswerGenerationError, Pipeline
 
 
 @dataclass(frozen=True)
@@ -21,6 +20,8 @@ class QuestionResult:
     # sources, and among the sources the answer cited. None when unanswerable.
     retrieved: bool | None
     supported: bool | None
+    rewrites: int
+    verified: bool | None
     error: str | None
     seconds: float
 
@@ -37,16 +38,13 @@ class Summary:
 
 async def evaluate_question(
     session: AsyncSession,
-    retriever: Retriever,
-    generator: AnswerGenerator,
+    pipeline: Pipeline,
     question: EvalQuestion,
     top_k: int,
 ) -> QuestionResult:
     started = time.perf_counter()
     try:
-        response, sources = await retrieve_and_answer(
-            session, retriever, generator, question.question, top_k
-        )
+        response, sources = await pipeline.answer(session, question.question, top_k)
     except AnswerGenerationError as exc:
         return QuestionResult(
             id=question.id,
@@ -57,6 +55,8 @@ async def evaluate_question(
             correct=False,
             retrieved=None,
             supported=None,
+            rewrites=0,
+            verified=None,
             error=str(exc),
             seconds=time.perf_counter() - started,
         )
@@ -83,6 +83,8 @@ async def evaluate_question(
         correct=correct,
         retrieved=retrieved,
         supported=supported,
+        rewrites=sum(step.step == "rewrite" for step in response.steps),
+        verified=response.verified,
         error=None,
         seconds=time.perf_counter() - started,
     )

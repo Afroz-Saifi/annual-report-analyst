@@ -4,9 +4,9 @@ import pytest
 from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_answer_generator, get_retriever, get_session
+from app.api.deps import get_pipeline, get_session
 from app.main import app
-from app.qa.baseline import DraftAnswer
+from app.qa.baseline import BaselinePipeline, DraftAnswer
 from app.retrieval.retriever import VectorRetriever
 from tests.fakes import AxisEmbeddings, FakeAnswerGenerator
 from tests.retrieval.seed import seed_report
@@ -20,21 +20,23 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
         yield db_session
 
     app.dependency_overrides[get_session] = session_override
-    app.dependency_overrides[get_retriever] = lambda: VectorRetriever(AxisEmbeddings(query_axis=1))
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
     app.dependency_overrides.clear()
 
 
 def use_generator(generator: FakeAnswerGenerator) -> None:
-    app.dependency_overrides[get_answer_generator] = lambda: generator
+    pipeline = BaselinePipeline(VectorRetriever(AxisEmbeddings(query_axis=1)), generator)
+    app.dependency_overrides[get_pipeline] = lambda: pipeline
 
 
 async def test_ask_answers_with_citations_from_the_retrieved_pages(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     await seed_report(db_session)
-    generator = FakeAnswerGenerator(DraftAnswer(answer="Attrition fell [1].", citations=[1]))
+    generator = FakeAnswerGenerator(
+        DraftAnswer(answer="Attrition fell [1].", citations=[1], found=True)
+    )
     use_generator(generator)
 
     response = await client.post("/ask", json={"question": "What was attrition?", "top_k": 2})
@@ -53,20 +55,21 @@ async def test_ask_answers_with_citations_from_the_retrieved_pages(
             "excerpt": "Voluntary attrition for permanent employees fell.",
         }
     ]
-    assert len(generator.seen_sources) == 2
+    assert len(generator.calls[0]) == 2
 
 
 async def test_ask_without_ingested_reports_says_so_and_skips_the_model(
     client: AsyncClient,
 ) -> None:
-    generator = FakeAnswerGenerator(DraftAnswer(answer="unused", citations=[]))
+    generator = FakeAnswerGenerator(DraftAnswer(answer="unused", citations=[], found=True))
     use_generator(generator)
 
     response = await client.post("/ask", json={"question": "What was attrition?"})
 
     assert response.status_code == 200
-    assert response.json() == {"answer": "No reports have been ingested yet.", "citations": []}
-    assert generator.seen_sources == []
+    body = response.json()
+    assert (body["answer"], body["citations"]) == ("No reports have been ingested yet.", [])
+    assert generator.calls == []
 
 
 async def test_ask_returns_502_when_the_model_fails(

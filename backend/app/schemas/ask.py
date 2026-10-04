@@ -16,6 +16,18 @@ class Citation(BaseModel):
     excerpt: str
 
 
+class AgentStep(BaseModel):
+    step: str
+    detail: str
+
+
 class AskResponse(BaseModel):
     answer: str
     citations: list[Citation]
+    verified: bool | None = Field(
+        default=None,
+        description="True when every figure in the answer appears in a cited source. "
+        "None when the answer was not checked.",
+    )
+    unverified_figures: list[str] = []
+    steps: list[AgentStep] = []

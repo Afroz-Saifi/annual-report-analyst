@@ -6,6 +6,7 @@ from app.db.models import Chunk, Report
 @dataclass(frozen=True)
 class RetrievedChunk:
     chunk_id: int
+    report_id: int
     company: str
     fiscal_year: int
     source_url: str
@@ -20,6 +21,7 @@ class RetrievedChunk:
 def to_retrieved(chunk: Chunk, report: Report, score: float) -> RetrievedChunk:
     return RetrievedChunk(
         chunk_id=chunk.id,
+        report_id=report.id,
         company=report.company,
         fiscal_year=report.fiscal_year,
         source_url=report.source_url,

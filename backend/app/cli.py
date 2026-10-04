@@ -15,8 +15,9 @@ from app.evaluation.runner import QuestionResult, Summary, evaluate_question, su
 from app.ingestion.embed import LocalEmbeddings
 from app.ingestion.manifest import load_manifest
 from app.ingestion.pipeline import ingest_report
-from app.qa.baseline import GeminiAnswerGenerator
-from app.retrieval.retriever import RetrievalMode, build_retriever
+from app.qa.baseline import Pipeline
+from app.qa.factory import PipelineName, build_pipeline
+from app.retrieval.retriever import RetrievalMode
 
 cli = typer.Typer(no_args_is_help=True)
 
@@ -73,6 +74,14 @@ def evaluate(
         RetrievalMode | None,
         typer.Option(help="vector, hybrid or hybrid_rerank. Defaults to the configured mode."),
     ] = None,
+    pipeline: Annotated[
+        PipelineName | None,
+        typer.Option(help="baseline or agent. Defaults to the configured pipeline."),
+    ] = None,
+    expand_pages: Annotated[
+        bool | None,
+        typer.Option(help="Show the model whole pages. Defaults to the configured setting."),
+    ] = None,
     output_dir: Annotated[Path, typer.Option(help="Where the full results are saved.")] = Path(
         "evals/results"
     ),
@@ -82,9 +91,11 @@ def evaluate(
     if settings.google_api_key is None or not settings.google_api_key.get_secret_value():
         typer.echo("GOOGLE_API_KEY is not set in backend/.env")
         raise typer.Exit(code=1)
-    generator = GeminiAnswerGenerator(settings.llm_model, settings.google_api_key)
     mode = retrieval or settings.retrieval_mode
-    results = asyncio.run(_evaluate(dataset, generator, mode, top_k))
+    pipeline_name = pipeline or settings.pipeline
+    expand = settings.expand_pages if expand_pages is None else expand_pages
+    built = build_pipeline(settings, settings.google_api_key, pipeline_name, mode, expand)
+    results = asyncio.run(_evaluate(dataset, built, top_k))
     summaries = summarise(results)
 
     typer.echo(_format_results(results))
@@ -97,7 +108,9 @@ def evaluate(
             {
                 "llm_model": settings.llm_model,
                 "embedding_model": settings.embedding_model,
+                "pipeline": pipeline_name,
                 "retrieval_mode": mode,
+                "expand_pages": expand,
                 "top_k": top_k,
                 "summary": [asdict(summary) for summary in summaries],
                 "results": [asdict(result) for result in results],
@@ -109,21 +122,13 @@ def evaluate(
     typer.echo(f"Full results saved to {output_path}")
 
 
-async def _evaluate(
-    dataset_path: Path, generator: GeminiAnswerGenerator, mode: RetrievalMode, top_k: int
-) -> list[QuestionResult]:
+async def _evaluate(dataset_path: Path, pipeline: Pipeline, top_k: int) -> list[QuestionResult]:
     questions = load_dataset(dataset_path).questions
-    settings = get_settings()
-    retriever = build_retriever(
-        mode, LocalEmbeddings(settings.embedding_model), settings.reranker_model
-    )
     results = []
     try:
         async with SessionLocal() as session:
             for question in questions:
-                results.append(
-                    await evaluate_question(session, retriever, generator, question, top_k)
-                )
+                results.append(await evaluate_question(session, pipeline, question, top_k))
     finally:
         await engine.dispose()
     return results
@@ -134,12 +139,16 @@ def _mark(value: bool | None) -> str:
 
 
 def _format_results(results: list[QuestionResult]) -> str:
-    lines = [f"{'question':<28} {'correct':<8} {'retrieved':<10} {'supported':<10} cited pages"]
+    lines = [
+        f"{'question':<28} {'correct':<8} {'retrieved':<10} {'supported':<10} "
+        f"{'verified':<9} {'rewrites':<9} cited pages"
+    ]
     for result in results:
         pages = "error: " + result.error[:60] if result.error else str(result.cited_pages)
         lines.append(
             f"{result.id:<28} {_mark(result.correct):<8} {_mark(result.retrieved):<10} "
-            f"{_mark(result.supported):<10} {pages}"
+            f"{_mark(result.supported):<10} {_mark(result.verified):<9} "
+            f"{result.rewrites:<9} {pages}"
         )
     return "\n".join(lines)
 

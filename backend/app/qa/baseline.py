@@ -1,7 +1,7 @@
 """Plain retrieve-then-answer question answering.
 
-One retrieval, one model call, no retries. This is what the evaluation
-measures before the agent is added.
+One retrieval, one model call, no retries. The evaluation compares the agent
+against this.
 """
 
 from typing import Protocol
@@ -18,6 +18,7 @@ from app.retrieval.types import RetrievedChunk
 from app.schemas.ask import AskResponse, Citation
 
 EXCERPT_CHARS = 300
+NO_REPORTS_ANSWER = "No reports have been ingested yet."
 
 SYSTEM_PROMPT = """You answer questions about company annual reports.
 
@@ -25,7 +26,8 @@ Rules:
 - Use only the numbered sources below. Do not use outside knowledge.
 - After each claim, cite the sources that support it, like [1] or [2][5].
 - Copy figures exactly as written in the source, with their units.
-- If the sources do not contain the answer, say so plainly and cite nothing.
+- If the sources do not contain the answer, say so plainly, cite nothing and
+  set found to false.
 - Report what the documents say. Do not give investment advice."""
 
 PROMPT = ChatPromptTemplate.from_messages(
@@ -36,6 +38,7 @@ PROMPT = ChatPromptTemplate.from_messages(
 class DraftAnswer(BaseModel):
     answer: str = Field(description="The answer, with [n] citations after each claim.")
     citations: list[int] = Field(description="Numbers of the sources the answer relies on.")
+    found: bool = Field(description="True when the sources contain the answer to the question.")
 
 
 class AnswerGenerationError(Exception):
@@ -91,27 +94,24 @@ def build_response(draft: DraftAnswer, sources: list[RetrievedChunk]) -> AskResp
     )
 
 
-async def retrieve_and_answer(
-    session: AsyncSession,
-    retriever: Retriever,
-    generator: AnswerGenerator,
-    question: str,
-    top_k: int,
-) -> tuple[AskResponse, list[RetrievedChunk]]:
-    """Answers the question and also returns every source the model was shown."""
-    sources = await retriever.retrieve(session, question, limit=top_k)
-    if not sources:
-        return AskResponse(answer="No reports have been ingested yet.", citations=[]), []
-    draft = await generator.generate(question, sources)
-    return build_response(draft, sources), sources
+class Pipeline(Protocol):
+    async def answer(
+        self, session: AsyncSession, question: str, top_k: int
+    ) -> tuple[AskResponse, list[RetrievedChunk]]:
+        """Answers the question and also returns every source the model was shown."""
+        ...
 
 
-async def answer_question(
-    session: AsyncSession,
-    retriever: Retriever,
-    generator: AnswerGenerator,
-    question: str,
-    top_k: int,
-) -> AskResponse:
-    response, _ = await retrieve_and_answer(session, retriever, generator, question, top_k)
-    return response
+class BaselinePipeline:
+    def __init__(self, retriever: Retriever, generator: AnswerGenerator) -> None:
+        self._retriever = retriever
+        self._generator = generator
+
+    async def answer(
+        self, session: AsyncSession, question: str, top_k: int
+    ) -> tuple[AskResponse, list[RetrievedChunk]]:
+        sources = await self._retriever.retrieve(session, question, limit=top_k)
+        if not sources:
+            return AskResponse(answer=NO_REPORTS_ANSWER, citations=[]), []
+        draft = await self._generator.generate(question, sources)
+        return build_response(draft, sources), sources

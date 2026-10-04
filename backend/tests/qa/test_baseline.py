@@ -5,6 +5,7 @@ from app.retrieval.types import RetrievedChunk
 def source(page: int, content: str, kind: str = "text") -> RetrievedChunk:
     return RetrievedChunk(
         chunk_id=page,
+        report_id=1,
         company="Infosys",
         fiscal_year=2026,
         source_url="https://example.com/ar.pdf",
@@ -26,7 +27,7 @@ def test_format_sources_numbers_each_source_with_its_report_and_page() -> None:
 
 def test_build_response_maps_citation_numbers_to_their_sources() -> None:
     sources = [source(36, "Dividend of 25 per share."), source(209, "Revenue from operations.")]
-    draft = DraftAnswer(answer="The dividend was 25 per share [1].", citations=[1])
+    draft = DraftAnswer(answer="The dividend was 25 per share [1].", citations=[1], found=True)
 
     response = build_response(draft, sources)
 
@@ -38,7 +39,7 @@ def test_build_response_maps_citation_numbers_to_their_sources() -> None:
 
 def test_build_response_drops_out_of_range_and_repeated_citations() -> None:
     sources = [source(36, "a"), source(209, "b")]
-    draft = DraftAnswer(answer="x [2][2][7]", citations=[2, 2, 7, 0, -1])
+    draft = DraftAnswer(answer="x [2][2][7]", citations=[2, 2, 7, 0, -1], found=True)
 
     response = build_response(draft, sources)
 
@@ -46,7 +47,7 @@ def test_build_response_drops_out_of_range_and_repeated_citations() -> None:
 
 
 def test_build_response_shortens_long_excerpts() -> None:
-    draft = DraftAnswer(answer="x [1]", citations=[1])
+    draft = DraftAnswer(answer="x [1]", citations=[1], found=True)
 
     response = build_response(draft, [source(1, "y" * 1000)])
 

@@ -14,7 +14,10 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     retrieval_mode: Literal["vector", "hybrid", "hybrid_rerank"] = "hybrid_rerank"
     reranker_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
+    expand_pages: bool = True
     llm_model: str = "gemini-3.5-flash"
+    pipeline: Literal["baseline", "agent"] = "agent"
+    max_rewrites: int = 2
     google_api_key: SecretStr | None = None
 
 

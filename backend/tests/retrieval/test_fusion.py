@@ -5,6 +5,7 @@ from app.retrieval.types import RetrievedChunk
 def chunk(chunk_id: int) -> RetrievedChunk:
     return RetrievedChunk(
         chunk_id=chunk_id,
+        report_id=1,
         company="Sample Ltd",
         fiscal_year=2025,
         source_url="https://example.com/sample.pdf",

@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from langchain_core.embeddings import Embeddings
 
 from app.db.models import EMBEDDING_DIM
@@ -23,15 +25,29 @@ class AxisEmbeddings(Embeddings):
 
 
 class FakeAnswerGenerator:
-    def __init__(self, draft: DraftAnswer | None = None) -> None:
+    """Returns a fixed draft, or whatever the given function makes of the sources."""
+
+    def __init__(
+        self, draft: DraftAnswer | Callable[[list[RetrievedChunk]], DraftAnswer] | None = None
+    ) -> None:
         self.draft = draft
-        self.seen_sources: list[RetrievedChunk] = []
+        self.calls: list[list[RetrievedChunk]] = []
 
     async def generate(self, question: str, sources: list[RetrievedChunk]) -> DraftAnswer:
-        self.seen_sources = sources
+        self.calls.append(sources)
         if self.draft is None:
             raise AnswerGenerationError("model unavailable")
-        return self.draft
+        return self.draft(sources) if callable(self.draft) else self.draft
+
+
+class FakeQueryRewriter:
+    def __init__(self, *rounds: list[str]) -> None:
+        self.rounds = list(rounds)
+        self.calls: list[list[str]] = []
+
+    async def rewrite(self, question: str, tried: list[str]) -> list[str]:
+        self.calls.append(tried)
+        return self.rounds.pop(0)
 
 
 class KeywordCountReranker:

@@ -21,10 +21,12 @@ It answers from the documents only. It does not give investment advice.
 1. **Ingestion** parses each PDF (text and tables), splits it into chunks,
    embeds them and stores them in PostgreSQL.
 2. **Retrieval** combines keyword and vector search, merges the two result
-   lists with Reciprocal Rank Fusion, then reranks.
-3. **The agent** (LangGraph) routes the question, retrieves, grades the
-   results, rewrites the query when they are weak, writes the answer and
-   verifies each number against the source.
+   lists with Reciprocal Rank Fusion, reranks, then hands the model the whole
+   page each hit came from.
+3. **The agent** (LangGraph) retrieves and answers. If the model reports that
+   the sources do not hold the answer, it rewrites the query and searches
+   again. It then checks every figure in the answer against the cited pages,
+   without a model call, and searches again if one is missing.
 4. **The API** (FastAPI) streams the agent's progress and the final answer to
    the web app.
 
@@ -53,7 +55,7 @@ It answers from the documents only. It does not give investment advice.
 - [x] Plain question answering with page citations
 - [x] Evaluation set and baseline accuracy score
 - [x] Hybrid search and reranking
-- [ ] LangGraph agent with grading, rewriting and number verification
+- [x] LangGraph agent with query rewriting and number verification
 - [ ] Web app: chat, live progress and cited-page viewer
 - [ ] 10–15 companies, model comparison, live demo
 
@@ -115,9 +117,13 @@ curl -X POST localhost:8000/ask \
   -d '{"question": "What dividend per share was recommended?"}'
 ```
 
-The response holds the answer, with `[n]` markers, and a `citations` list
-giving the report, page and excerpt behind each marker. Each question is one
-retrieval and one model call.
+The response holds:
+
+- `answer`, with `[n]` markers after each claim
+- `citations`: the report, page and excerpt behind each marker
+- `verified`: true when every figure in the answer appears on a cited page
+- `unverified_figures`: any figures that do not
+- `steps`: what the agent did (retrieve, answer, rewrite, verify)
 
 ## Evaluation
 
@@ -162,22 +168,52 @@ Retrieval is therefore the first thing to improve.
 Same questions, model and 8 sources per question; only the retrieval changes.
 Choose a mode with `--retrieval vector|hybrid|hybrid_rerank`.
 
-| Retrieval                                   | Correct         | Retrieved   | Time per question |
-| ------------------------------------------- | --------------- | ----------- | ----------------- |
-| Vector search (baseline)                    | 28/35 (80%)     | 25/32 (78%) | 3.3 s             |
-| Hybrid: vector + keyword, rank fusion       | 27/35 (77%)     | 24/32 (75%) | 3.6 s             |
-| **Hybrid + reranker (default)**             | **32/35 (91%)** | 29/32 (91%) | 5.6 s             |
+| Retrieval                                   | Correct         | Retrieved   | Mean time per question |
+| ------------------------------------------- | --------------- | ----------- | ---------------------- |
+| Vector search (baseline)                    | 28/35 (80%)     | 25/32 (78%) | 3.2 s                  |
+| Hybrid: vector + keyword, rank fusion       | 27/35 (77%)     | 24/32 (75%) | 3.5 s                  |
+| **Hybrid + reranker (default)**             | **32/35 (91%)** | 29/32 (91%) | 4.5 s                  |
 
 - Fusing keyword results in without a reranker made things slightly worse
   (two financial-statement questions lost, one people question gained). The
   cause has not been traced; keyword matches on words common to many pages
   are the likely one.
 - Reranking the top 30 fused results recovered every people question
-  (4/8 to 8/8) and cost about two seconds per question on a laptop CPU.
+  (4/8 to 8/8) and cost about one extra second per question on a laptop CPU.
 - The three remaining misses are candidate misses: the right chunk ranks
   below 30 in both searches, so the reranker never sees it. They are dense
   statement pages (balance sheet, cash flow, five-year summary) where a chunk
   is mostly figures. Query rewriting in the agent is the next attempt at them.
+
+### Agent comparison (4 October 2026)
+
+Same questions and model, hybrid retrieval with the reranker throughout.
+Choose with `--pipeline baseline|agent` and `--expand-pages/--no-expand-pages`.
+
+| Setup                                   | Correct          | Figures verified | Median time | Mean time |
+| --------------------------------------- | ---------------- | ---------------- | ----------- | --------- |
+| Plain pipeline, chunk sources           | 32/35 (91%)      | not checked      | 4.2 s       | 4.7 s     |
+| Agent, chunk sources                    | 33/35 (94%)      | 30 of 31         | 4.6 s       | 8.9 s     |
+| Plain pipeline, whole-page sources      | 34/35 (97%)      | not checked      | 4.4 s       | 4.7 s     |
+| **Agent, whole-page sources (default)** | **35/35 (100%)** | 32 of 32         | 4.9 s       | 8.0 s     |
+
+- Whole pages mattered most. A financial statement spans several chunks, and
+  the chunk that matches the question is often not the one holding the
+  figure. Showing the model the full page of each hit fixed two of the three
+  remaining misses on its own.
+- Query rewriting recovered the last one: the cash flow statement was only
+  found after the agent searched for the statement by name.
+- With chunk sources, the figure check flagged the one answer in which the
+  model had worked a figure out for itself instead of reading it from a
+  source. It raised no flag on any correct answer.
+- Rewrites are costly when they happen: a question with no answer in the
+  report takes two rewrites and about 25 to 30 seconds before the agent gives
+  up. Typical questions need none.
+
+**How far to trust these numbers.** This is 35 questions on one report, and
+the same questions were used to decide what to build next, so the score is
+optimistic. A fresh set of questions, and more reports, are needed before
+quoting it as a general accuracy figure.
 
 ## Repository layout
 

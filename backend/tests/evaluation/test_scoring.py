@@ -1,7 +1,8 @@
 from decimal import Decimal
 
+from app.core.numbers import numbers_in
 from app.evaluation.dataset import EvalQuestion
-from app.evaluation.scoring import contains_accepted_answer, numbers_in
+from app.evaluation.scoring import contains_accepted_answer
 
 
 def number_question(*accepted: str) -> EvalQuestion:
